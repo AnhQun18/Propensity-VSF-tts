@@ -1,0 +1,37 @@
+{
+  "dataset": "HOTEL",
+  "facts": {
+    "rows": 119390,
+    "columns": 32,
+    "positive": 44224,
+    "rate": 0.37041628277075134,
+    "duplicates": 31994,
+    "deduplicated_rows": 87396,
+    "deduplicated_rate": 0.27489816467572886
+  },
+  "analysis_date": "2026-11-01",
+  "script_sha256": "9237b2c2a4585441ba5f155529eb742609158191628aab6976abd22ba5ad6716",
+  "environment": {
+    "Python": "3.14.2",
+    "pandas": "2.3.3",
+    "numpy": "2.4.1",
+    "matplotlib": "3.10.8",
+    "Phương pháp": "Thống kê mô tả, không mô hình",
+    "Chunk CSV lớn": "250000"
+  },
+  "section_keys": [
+    "scope",
+    "dictionary",
+    "quality",
+    "distributions",
+    "target",
+    "time",
+    "dependencies",
+    "conclusions",
+    "reproducibility"
+  ],
+  "runner_only_revision": {
+    "current_script_sha256": "73fe6d5ae93ea267b8307796b75078326061f2c6fc4f2a2c6cb5e544f5e224bc",
+    "change": "IPython history đặt trong RAM để tránh ghi history ngoài workspace trên Windows. Đã kiểm tra capture stdout, Markdown và DataFrame; không thay đổi các hàm EDA hoặc kết quả đã thực thi."
+  }
+}

@@ -19,13 +19,19 @@ Dự án xây dựng hệ thống **Propensity Modeling** (Mô hình hóa xu hư
 
 ## 🗂️ 2. Cấu trúc Thư mục Dự án
 
+Dữ liệu CSV gốc được giữ ngoài Git. Xem [nguồn dữ liệu, cấu trúc thư mục và giới hạn upload GitHub](data/README.md) để chuẩn bị dữ liệu sau khi clone repo.
+
 ```text
 propensity-modeling-project/
 ├── data/                         # Dữ liệu raw và processed (đưa vào .gitignore nếu file nặng)
 │   ├── raw/
 │   └── processed/
-├── notebooks/                    # Chứa các file .ipynb làm EDA và thử nghiệm ban đầu
-│   └── 01_eda_and_exploration.ipynb
+├── notebooks/                    # Notebook EDA có code và output; mỗi bộ chỉ giữ một bản
+│   ├── HOTEL/hotel_descriptive_report.ipynb
+│   ├── AIRBNB/airbnb_descriptive_report.ipynb
+│   └── EXPEDIA/expedia_descriptive_report.ipynb
+├── scripts/                      # Script tái lập phân tích và báo cáo
+│   └── build_descriptive_reports.py
 ├── src/                          # Source code chính đóng gói thành Python package
 │   ├── __init__.py
 │   ├── data_loader.py            # Đọc và kiểm tra schema dữ liệu
@@ -36,10 +42,11 @@ propensity-modeling-project/
 │   └── monitoring.py             # Theo dõi chất lượng mô hình (Model Monitoring)
 ├── configs/                      # Các file cấu hình tham số (.yaml / .json)
 │   └── config.yaml
-├── reports/                      # Lưu biểu đồ EDA, kết quả đánh giá và Slide báo cáo
-│   ├── figures/
-│   ├── metrics/
-│   └── README.md
+├── reports/                      # Kết quả để đọc, không lưu bản sao notebook
+│   ├── README.md                 # Báo cáo tổng hợp
+│   ├── HOTEL/                    # Báo cáo, figures và analysis_metadata.json
+│   ├── AIRBNB/
+│   └── EXPEDIA/
 ├── setup.py                      # Cấu hình cài đặt package (pip install -e .)
 ├── pyproject.toml                # File cấu hình build package hiện đại
 ├── requirements.txt              # Danh sách thư viện và phiên bản
@@ -104,7 +111,14 @@ pip install -e .
 ### Bước 1: Phân tích Khám phá Dữ liệu (EDA)
 Mở Jupyter Notebook để phân tích trực quan hóa phân phối, phát hiện missing, outlier và kiểm tra độ mất cân bằng nhãn:
 ```bash
-jupyter notebook notebooks/01_eda_and_exploration.ipynb
+jupyter notebook notebooks/HOTEL/hotel_descriptive_report.ipynb
+```
+
+Hai notebook còn lại nằm trong `notebooks/AIRBNB/` và `notebooks/EXPEDIA/`. Đọc [báo cáo tổng hợp](reports/README.md) để mở báo cáo từng bộ. Phân tích hiện tại dừng ở EDA, chưa feature engineering hoặc huấn luyện mô hình; các bước phía dưới là hướng dẫn pipeline mẫu cho giai đoạn sau.
+
+Để dựng lại notebook và báo cáo từ dữ liệu gốc:
+```bash
+python scripts/build_descriptive_reports.py
 ```
 
 ### Bước 2: Huấn luyện Mô hình (Model Training)
