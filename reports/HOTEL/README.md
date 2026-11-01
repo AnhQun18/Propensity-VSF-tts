@@ -4,7 +4,44 @@
 
 Ngày phân tích: 2026-11-01. Đây không phải ngày thu thập dữ liệu.
 
-## 1. Bối cảnh, quần thể và câu hỏi phân tích
+## Tóm tắt điều hành — dữ liệu là gì, đáng tin đến đâu, dùng cho việc gì
+
+1. **Đơn vị và độ phủ:** 119,390 booking, 32 cột, ngày đến 2015-07-01–2017-08-31, hai khách sạn. Xem mục 1 và danh mục SHA-256 ở phụ lục.
+
+2. **Nhãn:** 44,224 booking hủy/no-show (37.04%); bảng trạng thái cuối ở mục 2 xác nhận gồm cả Canceled và No-Show.
+
+3. **Duplicate có tác động lớn:** 31,994 dòng trùng; giả định bỏ tất cả làm tỷ lệ nhãn từ 37.04% xuống 27.49%. Đây là độ nhạy, chưa phải quyết định xóa.
+
+4. **Khác biệt nhóm:** City 41.73% so với Resort 27.76% nhãn 1; xem biểu đồ hủy theo hotel ở mục 4. Chênh lệch chưa điều chỉnh theo kênh/cohort.
+
+5. **Thiếu theo cấu trúc:** company thiếu 94.31%, agent 13.69%; heatmap missing ở mục 2 và nguồn nghiệp vụ giúp phân biệt không áp dụng với thiếu thật.
+
+6. **Đuôi giá:** quy tắc 1,5×IQR gắn cờ 3,793 ADR (3.18% số không thiếu); max 5400.00. Xem boxplot và bảng outlier; chưa chứng minh đây là lỗi.
+
+7. **Tính phù hợp:** dùng cho cancellation/no-show ở cấp booking, với điều kiện loại thông tin kết quả và xác minh snapshot tại t0; chưa đủ để gọi là customer churn. Ma trận rủi ro và đề xuất ở mục 5–6 nêu các điểm cần giải quyết.
+
+## 1. Tổng quan bộ dữ liệu
+
+### Nguồn gốc và phạm vi thu thập
+
+Nguồn công bố: [trang dữ liệu/nghiên cứu gốc](https://pmc.ncbi.nlm.nih.gov/articles/PMC6297060/). [Giấy phép/điều khoản và trang phân phối](https://www.kaggle.com/datasets/jessemostipak/hotel-booking-demand). Thông tin nào chưa được lưu hoặc chưa xác minh được được ghi rõ, không điền bằng giả định.
+
+**Thông tin nguồn và phiên bản**
+
+| item | description |
+| --- | --- |
+| Tên / nơi công bố | Nuno Antonio, Ana de Almeida, Luis Nunes — Data in Brief; bản CSV gộp được phổ biến qua Kaggle |
+| Năm công bố | 2018 online; Data in Brief tập 22, 2019 |
+| Mục đích thu thập/công bố | Trích xuất PMS để nghiên cứu nhu cầu và kết quả hủy booking ở hai khách sạn Bồ Đào Nha. |
+| Cách thu thập / quần thể | Dữ liệu vận hành PMS/SQL và booking change log; hai cơ sở ở Algarve và Lisbon. Không phải mẫu ngẫu nhiên toàn ngành. |
+| Thời gian bao phủ quan sát được | Arrival 2015-07-01–2017-08-31 |
+| Ngày tải raw | Chưa được ghi lại; không dùng mtime/ctime để thay ngày tải |
+| Quy mô bảng train/chính | 119,390 dòng × 32 cột thô |
+| Dung lượng mọi CSV của bộ hiện có | 16,855,599 byte = 16.07 MiB; gồm cả bảng phụ/benchmark nếu có |
+| Phiên bản local | Nhận diện bằng tên file, bytes, số dòng và SHA-256 tại phụ lục |
+| Giấy phép / điều khoản | Bài báo nguồn ghi CC BY (4.0). Nguồn tải/phiên bản của chính bản CSV gộp trên máy chưa được ghi lại; không suy giấy phép CSV chỉ từ giấy phép bài báo. |
+
+### Bối cảnh, quần thể và câu hỏi phân tích
 
 Dữ liệu hiện có gồm **119,390 booking, 32 cột**, từ City Hotel và Resort Hotel. Mỗi dòng là một booking, không phải một khách hàng duy nhất. Không có booking ID hoặc customer ID để xác nhận danh tính, lịch sử khách hoặc nguyên nhân các dòng trùng.
 
@@ -14,54 +51,9 @@ Các câu hỏi EDA: nhãn thực sự gồm hành vi nào; khác biệt giữa 
 
 Nguồn nghiệp vụ: [Antonio, de Almeida & Nunes — Hotel booking demand datasets](https://pmc.ncbi.nlm.nih.gov/articles/PMC6297060/). Nguồn mô tả hai khách sạn tại Bồ Đào Nha và mốc trích xuất gắn với ngày trước ngày đến. Bản CSV trong dự án có thêm cột `hotel` để phân biệt hai cơ sở. Không suy rộng trực tiếp sang toàn ngành hoặc thị trường Việt Nam.
 
-**Danh mục file gốc; data_lines đếm dòng sau header, đối chiếu số dòng pandas**
+## 2. Chất lượng dữ liệu
 
-| file | data_lines | columns | bytes | sha256 |
-| --- | --- | --- | --- | --- |
-| hotel_bookings.csv | 119,390 | 32 | 16,855,599 | 7c2ae42a7353905ea136e5c2287f17c92c5435826598bfbb8491c6f0c7b1fc06 |
-
-## 2. Từ điển dữ liệu và kiểu dữ liệu thực tế
-
-Kiểu pandas không đồng nghĩa vai trò thống kê. `agent` và `company` được đọc như số nhưng là ID phân loại. Các cột lịch không phải các phép đo liên tục độc lập. Bảng dưới kiểm kê đủ 32 cột trên toàn bộ dữ liệu.
-
-**Schema, độ đa dạng và missing**
-
-| column | pandas_dtype | distinct_nonnull | missing_n | missing_pct | meaning | role_or_caution |
-| --- | --- | --- | --- | --- | --- | --- |
-| hotel | object | 2 | 0 | 0 | City Hotel / Resort Hotel | Phân khúc; chỉ hai cơ sở gốc, không đại diện toàn ngành |
-| is_canceled | int64 | 2 | 0 | 0 | Nhãn kết quả booking, 0/1 | Target; dữ liệu hiện tại gộp Canceled và No-Show vào 1 |
-| lead_time | int64 | 479 | 0 | 0 | Số ngày từ lúc nhập booking đến ngày đến | Kiểm tra mốc dự đoán và lịch sử thay đổi ngày đến |
-| arrival_date_year | int64 | 3 | 0 | 0 | Năm đến dự kiến | Thời gian; không coi là đại lượng liên tục thông thường |
-| arrival_date_month | object | 12 | 0 | 0 | Tháng đến dự kiến | Thời gian dạng tên tháng |
-| arrival_date_week_number | int64 | 53 | 0 | 0 | Tuần của ngày đến | Thời gian, chồng lặp thông tin với ngày/tháng |
-| arrival_date_day_of_month | int64 | 31 | 0 | 0 | Ngày trong tháng của ngày đến | Thời gian |
-| stays_in_weekend_nights | int64 | 17 | 0 | 0 | Số đêm cuối tuần đặt/lưu trú | Số đếm; xác minh snapshot |
-| stays_in_week_nights | int64 | 35 | 0 | 0 | Số đêm ngày thường đặt/lưu trú | Số đếm; xác minh snapshot |
-| adults | int64 | 14 | 0 | 0 | Số người lớn | Kiểm tra 0 và số lượng lớn |
-| children | float64 | 5 | 4 | 0.0034 | Số trẻ em | Có missing; không mặc định missing = 0 |
-| babies | int64 | 5 | 0 | 0 | Số em bé | Số đếm |
-| meal | object | 5 | 0 | 0 | Gói bữa ăn | Undefined/SC có thể có nghĩa không có gói ăn |
-| country | object | 177 | 488 | 0.4087 | Quốc gia nguồn gốc khách | Mã phân loại; có thể cập nhật gần check-in |
-| market_segment | object | 8 | 0 | 0 | Phân khúc thị trường | Biến phân loại |
-| distribution_channel | object | 5 | 0 | 0 | Kênh phân phối | Biến phân loại; có liên hệ market_segment |
-| is_repeated_guest | int64 | 2 | 0 | 0 | Khách quay lại, 0/1 | Đã tồn tại trong raw; không tạo lại feature |
-| previous_cancellations | int64 | 15 | 0 | 0 | Số booking hủy trước booking hiện tại | Lịch sử; cần xác minh cách chốt thời gian |
-| previous_bookings_not_canceled | int64 | 73 | 0 | 0 | Số booking trước không hủy | Lịch sử; cần xác minh cách chốt thời gian |
-| reserved_room_type | object | 10 | 0 | 0 | Mã loại phòng đã đặt | Biến phân loại |
-| assigned_room_type | object | 12 | 0 | 0 | Mã loại phòng được phân | Có thể cập nhật sau đặt; chưa chứng minh có sẵn tại t0 |
-| booking_changes | int64 | 21 | 0 | 0 | Số lần sửa booking đến check-in/hủy | Biến tích lũy; nguy cơ dùng thông tin tương lai |
-| deposit_type | object | 3 | 0 | 0 | Trạng thái đặt cọc từ thanh toán | Không mặc định đồng nghĩa chính sách đã biết lúc tạo booking |
-| agent | float64 | 333 | 16,340 | 13.6862 | ID đại lý | Phân loại; NULL có thể là không áp dụng, không phải số liên tục |
-| company | float64 | 352 | 112,593 | 94.3069 | ID công ty/thực thể trả tiền | Phân loại; NULL có thể là không áp dụng |
-| days_in_waiting_list | int64 | 128 | 0 | 0 | Số ngày chờ trước xác nhận | Chỉ biết đầy đủ khi kết thúc chờ |
-| customer_type | object | 4 | 0 | 0 | Contract / Group / Transient / Transient-Party | Biến phân loại |
-| adr | float64 | 8,879 | 0 | 0 | Average Daily Rate, tiền/đêm | Theo nguồn là tổng giao dịch lưu trú / số đêm; xác minh thời điểm và đơn vị |
-| required_car_parking_spaces | int64 | 5 | 0 | 0 | Số chỗ đỗ xe yêu cầu | Có thể cập nhật theo booking |
-| total_of_special_requests | int64 | 6 | 0 | 0 | Số yêu cầu đặc biệt | Có thể cập nhật theo booking |
-| reservation_status | object | 3 | 0 | 0 | Trạng thái cuối: Canceled / Check-Out / No-Show | Kết quả sau sự kiện; rò rỉ nhãn |
-| reservation_status_date | object | 926 | 0 | 0 | Ngày thiết lập trạng thái cuối | Kết quả sau sự kiện; không dùng làm đầu vào dự đoán |
-
-## 3. Chất lượng dữ liệu và định nghĩa nhãn
+### Chất lượng dữ liệu và định nghĩa nhãn
 
 `is_canceled=1` có **44,224 booking (37.04%)**. Bảng chéo xác nhận nhãn này gồm cả `Canceled` và `No-Show`; nhãn 0 là `Check-Out`. Vì vậy tên mục tiêu trong báo cáo là **hủy/no-show**, thay vì chỉ hủy chủ động.
 
@@ -101,9 +93,226 @@ ADR âm/cao hoặc booking 0 đêm/0 khách là trường hợp cần xác minh.
 | Raw: giữ nguyên | 119,390 | 44,224 | 37.0416 |
 | Giả định bỏ mọi dòng trùng (chỉ phân tích độ nhạy) | 87,396 | 24,025 | 27.4898 |
 
-## 4. Phân phối đơn biến và mức độ bao phủ
+### Missing có quy luật hay không?
+
+Heatmap chọn tối đa 12 cột có NA. Chọn dòng để hiển thị với seed=42 và sắp theo pattern; bảng tỷ lệ theo nhóm dùng quần thể phân tích công bố, không chỉ các dòng hiển thị.
+
+**Missing (%) theo is_canceled; toàn bộ booking HOTEL**
+
+| is_canceled | company | agent | country | children |
+| --- | --- | --- | --- | --- |
+| 0 | 92.5418 | 16.3771 | 0.5601 | 0 |
+| 1 | 97.3069 | 9.1127 | 0.1515 | 0.009 |
+
+![missing patterns](figures/missing_patterns.png)
+
+Nhận xét: company thiếu 94.31% trong toàn bộ booking HOTEL; chênh lệch missing lớn nhất giữa các nhóm is_canceled là 7.26 điểm phần trăm ở agent. Ô xanh là NA. Mẫu dòng hiển thị dùng seed=42; việc sắp theo pattern chỉ để nhìn cụm thiếu, không phải thứ tự thời gian. Các khác biệt này không đủ kết luận cơ chế MCAR/MAR/MNAR.
+
+### Ngoại lai: lượng hóa và phân biệt quy tắc với kết luận lỗi
+
+Quy tắc 1,5×IQR chỉ gắn cờ để kiểm tra, không tự chứng minh lỗi. Mẫu số là số giá trị không thiếu của từng cột; bảng giữ rõ quần thể và trường hợp IQR=0.
+
+**Hàng rào IQR trên dữ liệu công bố**
+
+| column | population | nonnull_n | q1 | q3 | iqr | lower_fence | upper_fence | flagged_n | flagged_pct_nonnull | iqr_zero |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| adr | toàn bộ booking HOTEL | 119,390 | 69.29 | 126 | 56.71 | -15.775 | 211.065 | 3,793 | 3.177 | 0 |
+| lead_time | toàn bộ booking HOTEL | 119,390 | 18 | 160 | 142 | -195 | 373 | 3,005 | 2.517 | 0 |
+| adults | toàn bộ booking HOTEL | 119,390 | 2 | 2 | 0 | 2 | 2 | 29,710 | 24.8848 | 1 |
+| children | toàn bộ booking HOTEL | 119,386 | 0 | 0 | 0 | 0 | 0 | 8,590 | 7.1951 | 1 |
+| booking_changes | toàn bộ booking HOTEL | 119,390 | 0 | 0 | 0 | 0 | 0 | 18,076 | 15.1403 | 1 |
+
+![outliers and target](figures/outliers_and_target.png)
+
+Nhận xét: theo hàng rào Q1−1,5×IQR và Q3+1,5×IQR, adr có 3,793/119,390 giá trị bị gắn cờ (3.18%) trong toàn bộ booking HOTEL; đây là bất thường thống kê, chưa phải lỗi nhập liệu. Median lead_time theo nhãn: 0=45.00, 1=113.00. Boxplot bên phải ẩn các điểm ngoài whisker để đọc vùng giữa, không xóa chúng khỏi bảng hay raw. Đơn vị xem từ điển; IQR=0 ở biến rời rạc có thể gắn cờ nhiều giá trị thật. Trục x boxplot raw dùng symlog; hàng rào IQR vẫn tính trên giá trị raw, không phải log.
+
+## 3. Phân tích đơn biến
+
+### Phân phối đơn biến và mức độ bao phủ
 
 Thống kê định lượng dùng toàn bộ dữ liệu, bỏ NA riêng ở từng cột. p1/p95/p99 cho thấy phần đuôi mà mean/median có thể che khuất. Bảng category hiển thị top 8 mỗi biến, tỷ lệ luôn chia cho toàn bộ booking (kể cả missing), nên tổng top 8 có thể nhỏ hơn 100%. ADR trên biểu đồ chỉ giới hạn vùng nhìn; dữ liệu và thống kê không bị cắt.
+
+![distributions](figures/distributions.png)
+
+Nhận xét: lead_time có median 69 ngày so với mean 104.01, thể hiện đuôi phải; ADR median 94.58, max 5400.00. Biểu đồ ADR chỉ vẽ 0–500, có 4 dòng ngoài vùng nhìn; thống kê vẫn giữ tất cả.
+
+### Biến phân loại và nhãn
+
+Biểu đồ hiển thị top 8 nhóm theo số lượng; bảng kiểm kê giữ cả các nhóm nhỏ. Nhóm hiếm được báo với ngưỡng mô tả n<100, chưa gộp category.
+
+**Tần suất đầy đủ của market_segment**
+
+| market_segment | n | positive |
+| --- | --- | --- |
+| Online TA | 56,477 | 20,739 |
+| Offline TA/TO | 24,219 | 8,311 |
+| Groups | 19,811 | 12,097 |
+| Direct | 12,606 | 1,934 |
+| Corporate | 5,295 | 992 |
+| Complementary | 743 | 97 |
+| Aviation | 237 | 52 |
+| Undefined | 2 | 2 |
+
+![categories and target](figures/categories_and_target.png)
+
+Nhận xét: market_segment có 8 nhóm (kể cả NA); 1 nhóm dưới 100 quan sát. Nhóm lớn nhất Online TA có 56,477 observations, tỷ lệ nhãn 1 là 36.72%. Hai trục trả lời số lượng nhóm và tỷ lệ bên trong nhóm, không dùng lẫn mẫu số; chênh lệch quan sát chưa được điều chỉnh theo cohort/biến khác.
+
+## 4. Phân tích đa biến, thời gian và nhóm con
+
+### Mối liên hệ với nhãn và tương tác phân khúc
+
+Mẫu số là booking trong từng nhóm; không phải tỷ trọng nhóm trong toàn dữ liệu. Các khoảng Wilson 95% là mô tả tham khảo dưới giả định quan sát độc lập; duplicate, booking theo đoàn và khách lặp có thể làm mức bất định thực tế lớn hơn. Nhóm dưới 100 quan sát được gắn cờ, không xếp hạng chắc chắn. Các liên hệ không phải tác động nhân quả của kênh, đặt cọc hoặc thời gian đặt trước. Bảng hotel × market_segment giúp kiểm tra việc khác cơ cấu khách giữa hai cơ sở.
+
+**Tỷ lệ nhãn 1 theo hotel**
+
+| hotel | n | positive | rate_pct | ci95_low_pct | ci95_high_pct | n_under_100 |
+| --- | --- | --- | --- | --- | --- | --- |
+| City Hotel | 79,330 | 33,102 | 41.727 | 41.3842 | 42.0705 | 0 |
+| Resort Hotel | 40,060 | 11,122 | 27.7634 | 27.327 | 28.204 | 0 |
+
+**Lead time — nhóm chỉ phục vụ thống kê EDA**
+
+| lead_time_group | n | positive | rate_pct | ci95_low_pct | ci95_high_pct | n_under_100 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 31–90 | 29,553 | 11,141 | 37.6984 | 37.1475 | 38.2525 | 0 |
+| 91–180 | 26,439 | 11,821 | 44.7105 | 44.112 | 45.3105 | 0 |
+| 181–365 | 21,544 | 11,947 | 55.454 | 54.7894 | 56.1166 | 0 |
+| 8–30 | 18,960 | 5,283 | 27.8639 | 27.2303 | 28.5065 | 0 |
+| 1–7 | 13,401 | 1,472 | 10.9843 | 10.466 | 11.5249 | 0 |
+| 0 | 6,345 | 430 | 6.777 | 6.1843 | 7.422 | 0 |
+| >365 | 3,148 | 2,130 | 67.662 | 66.0073 | 69.2737 | 0 |
+
+![target by hotel](figures/target_by_hotel.png)
+
+Nhận xét: tỷ lệ hủy/no-show City Hotel 41.73% và Resort Hotel 27.76%, chênh 13.96 điểm phần trăm. Đây là khác biệt giữa hai cơ sở có cơ cấu khách khác nhau, không phải tác động riêng của loại khách sạn.
+
+### Tương quan, tương tác và chồng lặp thông tin
+
+Ma trận Spearman dùng từng cặp không thiếu. Scatter lấy tối đa 4.000 điểm seed=42 để tránh che lấp, giữ nhãn trục và đơn vị. Chưa thực hiện kiểm định nhiều giả thuyết hay kết luận nhân quả; cấu trúc phụ thuộc quan sát và kích thước hiệu ứng cần được xét trước p-value.
+
+**Ma trận Spearman**
+
+| column | lead_time | adr | stays_in_week_nights | stays_in_weekend_nights | adults | children | booking_changes | total_of_special_requests |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| lead_time | 1 | 0.015 | 0.2963 | 0.1621 | 0.1922 | -0.0162 | -0.0078 | -0.0741 |
+| adr | 0.015 | 1 | 0.0938 | 0.0514 | 0.2798 | 0.2655 | 0.0052 | 0.1964 |
+| stays_in_week_nights | 0.2963 | 0.0938 | 1 | 0.2381 | 0.153 | 0.0543 | 0.0645 | 0.0762 |
+| stays_in_weekend_nights | 0.1621 | 0.0514 | 0.2381 | 1 | 0.1268 | 0.0528 | 0.0404 | 0.0794 |
+| adults | 0.1922 | 0.2798 | 0.153 | 0.1268 | 1 | 0.0721 | -0.085 | 0.1616 |
+| children | -0.0162 | 0.2655 | 0.0543 | 0.0528 | 0.0721 | 1 | 0.0659 | 0.0957 |
+| booking_changes | -0.0078 | 0.0052 | 0.0645 | 0.0404 | -0.085 | 0.0659 | 1 | 0.0419 |
+| total_of_special_requests | -0.0741 | 0.1964 | 0.0762 | 0.0794 | 0.1616 | 0.0957 | 0.0419 | 1 |
+
+![multivariate](figures/multivariate.png)
+
+Nhận xét: trong toàn bộ booking HOTEL, cặp có |rho| lớn nhất của ma trận công bố là lead_time–stays_in_week_nights (rho=0.296); riêng lead_time–adr có rho=0.015. Scatter chỉ hiển thị tối đa 4.000 cặp không thiếu, seed=42; đơn vị từng biến xem từ điển. Heatmap dùng dữ liệu toàn bộ booking HOTEL, không chỉ các điểm scatter. Tương quan cao là dấu hiệu chồng lặp để kiểm tra, không tự chứng minh đa cộng tuyến tuyến tính hoặc quan hệ nhân quả. Trục y của scatter dùng thang symlog để đọc đuôi dài; giá trị raw không bị biến đổi/lưu lại.
+
+### Thời gian, mùa vụ và giới hạn đánh giá
+
+Ngày đến parse được nằm trong **2015-07-01–2017-08-31**. Đây là thời gian ngày đến, không phải thời gian tạo booking. Các tháng đầu/cuối không bao phủ đủ năm, nên không gộp số booking theo tên tháng rồi kết luận mùa vụ. Đồ thị dưới giữ năm–tháng và tách hai khách sạn. Chưa đủ cơ sở để chọn một cách chia tập cuối cùng: cần định nghĩa t0, nhãn đã trưởng thành và đối tượng còn có thể can thiệp; nếu đánh giá tương lai thì ưu tiên giữ trật tự thời gian, đồng thời kiểm tra duplicate qua các tập.
+
+![calendar](figures/calendar.png)
+
+Nhận xét: tỷ lệ nhãn theo tháng đến gộp hai cơ sở dao động 20.77–45.35%; số booking và tỷ lệ hủy thay đổi theo thời gian và khách sạn. Các tháng có số năm bao phủ khác nhau, nên chưa kết luận mùa vụ lặp ổn định chỉ từ đường này.
+
+## 5. Hạn chế, rủi ro và quyền riêng tư
+
+Tách điều đã quan sát khỏi nguyên nhân chưa được chứng minh. Không diễn giải chênh lệch nhóm thành đặc điểm cố hữu của giới tính/tuổi/quốc gia và không thực hiện nhận diện lại cá nhân.
+
+**Rủi ro và giới hạn sử dụng**
+
+| issue | evidence_or_limit |
+| --- | --- |
+| Quyền riêng tư | Nguồn đã loại thông tin định danh trực tiếp; không có customer/booking ID để liên kết tin cậy. Quốc gia, ngày đến, cấu trúc đoàn vẫn là thông tin có thể kết hợp. |
+| Quần thể | Hai khách sạn ở Bồ Đào Nha và một giai đoạn lịch sử, không đại diện cho mọi khách sạn hoặc thị trường Việt Nam. |
+| Phụ thuộc / bias | Booking theo đoàn hoặc khách lặp không nhận diện được; duplicate có thể làm khoảng tin cậy quá hẹp. |
+| Rò rỉ | Trạng thái cuối và ngày trạng thái là kết quả; các biến cập nhật theo vòng đời cần lịch sử tại t0. |
+| Đồng ý / quyền sử dụng | CSV không có biểu mẫu đồng ý hay hồ sơ pháp lý thu thập. Không suy dữ liệu công khai = đồng ý cho mọi mục đích; đọc điều khoản nguồn, không tự gán giấy phép mở. |
+| Giới hạn suy luận | EDA là mô tả, không phải kiểm định tác động can thiệp. Khoảng Wilson nếu có chỉ theo giả định độc lập; chưa đánh giá chất lượng mô hình hoặc tính công bằng của mô hình. |
+
+## 6. Kết luận và đề xuất bước tiếp theo
+
+### Kết luận và câu hỏi còn mở
+
+**Kết luận đã kiểm chứng:** nhãn 1 chiếm 37.04%, gồm hủy và no-show; có 31,994 dòng trùng hoàn toàn; tỷ lệ thay đổi mạnh theo giả định bỏ trùng; hai cơ sở và các kênh có cơ cấu khác nhau. Thông tin trạng thái cuối không thể là đầu vào dự đoán.
+
+**Mức độ phù hợp:** tốt cho nghiên cứu cancellation/no-show ở cấp booking. Chưa đủ để mô tả churn ở cấp khách hàng hoặc mô phỏng chấm điểm ngay lúc tạo booking một cách đáng tin cậy.
+
+**Cần xác minh trước giai đoạn tiếp theo:** (1) thời điểm chấm điểm và tập booking còn hiệu lực; (2) lịch sử giá trị tại t0 cho từng biến, nhất là assigned_room_type, booking_changes, deposit_type, ADR và yêu cầu bổ sung; (3) định danh booking/nhóm để giải thích trùng; (4) ý nghĩa các booking 0 khách/0 đêm và ADR bất thường; (5) phạm vi áp dụng ngoài hai khách sạn.
+
+Không xóa dòng, impute, clipping, encoding, tạo feature hoặc train model trong báo cáo này. Các phân nhóm ngày/tháng và lead time chỉ là bảng thống kê EDA; không được xuất thành tập huấn luyện.
+
+### Đề xuất bước tiếp theo — chưa thực hiện
+
+Các lựa chọn dưới đây là hướng nghiên cứu dựa trên EDA, không phải các phép tiền xử lý/feature/model đã được áp dụng. Chốt đối tượng, t0, thời hạn nhãn và tiêu chí kinh doanh trước; fit mọi phép biến đổi ở tập train sau khi thiết kế đánh giá.
+
+**Đề xuất và cơ sở dữ liệu**
+
+| topic | eda_basis | proposal_only |
+| --- | --- | --- |
+| Missing / ID | Agent/company có thể không áp dụng; children có NA | Đối chiếu nghĩa NULL; cân nhắc category không áp dụng, imputation chỉ học trên train nếu cần |
+| Outlier / duplicate | Tỷ lệ nhãn nhạy với bỏ trùng; ADR/0 đêm cần xác minh | Xác minh khóa và nghiệp vụ, phân tích độ nhạy trước khi xóa/clipping |
+| Mã hóa / chuẩn hóa | ID/category khác đại lượng số | Mã hóa phù hợp; chỉ cân nhắc scaling cho mô hình nhạy thang đo, không bắt buộc cho cây |
+| Cân bằng lớp | Nhãn 1 khoảng 37%, chưa phải cực hiếm | Bắt đầu với phân phối gốc; không tự động SMOTE/weight |
+| Feature engineering (đề xuất) | Có số đêm và lịch đến; nhiều cột cập nhật theo vòng đời | Có thể nghiên cứu cấu trúc lưu trú/lịch sau khi chốt t0; mọi tỷ lệ phải xử lý mẫu số 0 |
+| Hướng mô hình (đề xuất) | Target booking nhị phân | Baseline xác suất và mô hình nhị phân; đánh giá theo thời gian, calibration và chi phí vận hành sau khi kiểm soát leakage |
+
+## Phụ lục — từ điển và bảng chi tiết
+
+### Từ điển dữ liệu và kiểu dữ liệu thực tế
+
+Kiểu pandas không đồng nghĩa vai trò thống kê. `agent` và `company` được đọc như số nhưng là ID phân loại. Các cột lịch không phải các phép đo liên tục độc lập. Bảng dưới kiểm kê đủ 32 cột trên toàn bộ dữ liệu.
+
+**Schema, độ đa dạng và missing**
+
+| column | pandas_dtype | distinct_nonnull | missing_n | missing_pct | meaning | role_or_caution | role | unit | observed_domain_and_basis |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| hotel | object | 2 | 0 | 0 | City Hotel / Resort Hotel | Phân khúc; chỉ hai cơ sở gốc, không đại diện toàn ngành | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 'City Hotel', 'Resort Hotel' |
+| is_canceled | int64 | 2 | 0 | 0 | Nhãn kết quả booking, 0/1 | Target; dữ liệu hiện tại gộp Canceled và No-Show vào 1 | đích | cờ 0/1 | Toàn bảng: np.int64(0), np.int64(1) |
+| lead_time | int64 | 479 | 0 | 0 | Số ngày từ lúc nhập booking đến ngày đến | Kiểm tra mốc dự đoán và lịch sử thay đổi ngày đến | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | ngày | Toàn bảng: [0, 737], 479 giá trị phân biệt |
+| arrival_date_year | int64 | 3 | 0 | 0 | Năm đến dự kiến | Thời gian; không coi là đại lượng liên tục thông thường | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | thành phần lịch theo tên biến | Toàn bảng: np.int64(2015), np.int64(2016), np.int64(2017) |
+| arrival_date_month | object | 12 | 0 | 0 | Tháng đến dự kiến | Thời gian dạng tên tháng | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | thành phần lịch theo tên biến | Toàn bảng: 'April', 'August', 'December', 'February', 'January', 'July', 'June', 'March', 'May', 'November', 'October', 'September' |
+| arrival_date_week_number | int64 | 53 | 0 | 0 | Tuần của ngày đến | Thời gian, chồng lặp thông tin với ngày/tháng | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | thành phần lịch theo tên biến | Toàn bảng: [1, 53], 53 giá trị phân biệt |
+| arrival_date_day_of_month | int64 | 31 | 0 | 0 | Ngày trong tháng của ngày đến | Thời gian | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | thành phần lịch theo tên biến | Toàn bảng: [1, 31], 31 giá trị phân biệt |
+| stays_in_weekend_nights | int64 | 17 | 0 | 0 | Số đêm cuối tuần đặt/lưu trú | Số đếm; xác minh snapshot | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | đêm | Toàn bảng: [0, 19], 17 giá trị phân biệt |
+| stays_in_week_nights | int64 | 35 | 0 | 0 | Số đêm ngày thường đặt/lưu trú | Số đếm; xác minh snapshot | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | đêm | Toàn bảng: [0, 50], 35 giá trị phân biệt |
+| adults | int64 | 14 | 0 | 0 | Số người lớn | Kiểm tra 0 và số lượng lớn | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | người | Toàn bảng: [0, 55], 14 giá trị phân biệt |
+| children | float64 | 5 | 4 | 0.0034 | Số trẻ em | Có missing; không mặc định missing = 0 | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | người | Toàn bảng: np.float64(0.0), np.float64(1.0), np.float64(10.0), np.float64(2.0), np.float64(3.0) |
+| babies | int64 | 5 | 0 | 0 | Số em bé | Số đếm | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | người | Toàn bảng: np.int64(0), np.int64(1), np.int64(10), np.int64(2), np.int64(9) |
+| meal | object | 5 | 0 | 0 | Gói bữa ăn | Undefined/SC có thể có nghĩa không có gói ăn | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 'BB', 'FB', 'HB', 'SC', 'Undefined' |
+| country | object | 177 | 488 | 0.4087 | Quốc gia nguồn gốc khách | Mã phân loại; có thể cập nhật gần check-in | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 177 giá trị khác nhau; top category tại phụ lục |
+| market_segment | object | 8 | 0 | 0 | Phân khúc thị trường | Biến phân loại | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 'Aviation', 'Complementary', 'Corporate', 'Direct', 'Groups', 'Offline TA/TO', 'Online TA', 'Undefined' |
+| distribution_channel | object | 5 | 0 | 0 | Kênh phân phối | Biến phân loại; có liên hệ market_segment | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 'Corporate', 'Direct', 'GDS', 'TA/TO', 'Undefined' |
+| is_repeated_guest | int64 | 2 | 0 | 0 | Khách quay lại, 0/1 | Đã tồn tại trong raw; không tạo lại feature | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | cờ 0/1 | Toàn bảng: np.int64(0), np.int64(1) |
+| previous_cancellations | int64 | 15 | 0 | 0 | Số booking hủy trước booking hiện tại | Lịch sử; cần xác minh cách chốt thời gian | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | lần/booking/yêu cầu theo tên biến | Toàn bảng: [0, 26], 15 giá trị phân biệt |
+| previous_bookings_not_canceled | int64 | 73 | 0 | 0 | Số booking trước không hủy | Lịch sử; cần xác minh cách chốt thời gian | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | lần/booking/yêu cầu theo tên biến | Toàn bảng: [0, 72], 73 giá trị phân biệt |
+| reserved_room_type | object | 10 | 0 | 0 | Mã loại phòng đã đặt | Biến phân loại | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'L', 'P' |
+| assigned_room_type | object | 12 | 0 | 0 | Mã loại phòng được phân | Có thể cập nhật sau đặt; chưa chứng minh có sẵn tại t0 | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'P' |
+| booking_changes | int64 | 21 | 0 | 0 | Số lần sửa booking đến check-in/hủy | Biến tích lũy; nguy cơ dùng thông tin tương lai | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | lần/booking/yêu cầu theo tên biến | Toàn bảng: [0, 21], 21 giá trị phân biệt |
+| deposit_type | object | 3 | 0 | 0 | Trạng thái đặt cọc từ thanh toán | Không mặc định đồng nghĩa chính sách đã biết lúc tạo booking | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 'No Deposit', 'Non Refund', 'Refundable' |
+| agent | float64 | 333 | 16,340 | 13.6862 | ID đại lý | Phân loại; NULL có thể là không áp dụng, không phải số liên tục | định danh / khóa nhóm, không phải số liên tục | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: [1, 535], 333 giá trị phân biệt |
+| company | float64 | 352 | 112,593 | 94.3069 | ID công ty/thực thể trả tiền | Phân loại; NULL có thể là không áp dụng | định danh / khóa nhóm, không phải số liên tục | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: [6, 543], 352 giá trị phân biệt |
+| days_in_waiting_list | int64 | 128 | 0 | 0 | Số ngày chờ trước xác nhận | Chỉ biết đầy đủ khi kết thúc chờ | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | ngày | Toàn bảng: [0, 391], 128 giá trị phân biệt |
+| customer_type | object | 4 | 0 | 0 | Contract / Group / Transient / Transient-Party | Biến phân loại | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 'Contract', 'Group', 'Transient', 'Transient-Party' |
+| adr | float64 | 8,879 | 0 | 0 | Average Daily Rate, tiền/đêm | Theo nguồn là tổng giao dịch lưu trú / số đêm; xác minh thời điểm và đơn vị | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | tiền/đêm; xác minh đồng tiền của bản CSV | Toàn bảng: [-6.38, 5400], 8879 giá trị phân biệt |
+| required_car_parking_spaces | int64 | 5 | 0 | 0 | Số chỗ đỗ xe yêu cầu | Có thể cập nhật theo booking | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | chỗ đỗ xe | Toàn bảng: np.int64(0), np.int64(1), np.int64(2), np.int64(3), np.int64(8) |
+| total_of_special_requests | int64 | 6 | 0 | 0 | Số yêu cầu đặc biệt | Có thể cập nhật theo booking | đầu vào ứng viên; chưa xác nhận khả dụng tại t0 | lần/booking/yêu cầu theo tên biến | Toàn bảng: np.int64(0), np.int64(1), np.int64(2), np.int64(3), np.int64(4), np.int64(5) |
+| reservation_status | object | 3 | 0 | 0 | Trạng thái cuối: Canceled / Check-Out / No-Show | Kết quả sau sự kiện; rò rỉ nhãn | kết quả / nguy cơ rò rỉ đích | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 'Canceled', 'Check-Out', 'No-Show' |
+| reservation_status_date | object | 926 | 0 | 0 | Ngày thiết lập trạng thái cuối | Kết quả sau sự kiện; không dùng làm đầu vào dự đoán | kết quả / nguy cơ rò rỉ đích | ngày/giờ theo định dạng nguồn; timezone chưa xác minh | Toàn bảng: 926 giá trị khác nhau; top category tại phụ lục |
+
+### Danh mục file, dung lượng và SHA-256
+
+Phiên bản local được xác định bằng các giá trị dưới đây; không suy ngày tải từ ngày sửa file.
+
+**Danh mục file gốc; data_lines đếm dòng sau header, đối chiếu số dòng pandas**
+
+| file | data_lines | columns | bytes | sha256 |
+| --- | --- | --- | --- | --- |
+| hotel_bookings.csv | 119,390 | 32 | 16,855,599 | 7c2ae42a7353905ea136e5c2287f17c92c5435826598bfbb8491c6f0c7b1fc06 |
+
+### Bảng đơn biến đầy đủ
+
+Các bảng thống kê dưới đây bổ sung cho các biểu đồ ở phần chính. Top category không phải toàn bộ domain; đối chiếu từ điển.
 
 **Thống kê định lượng toàn bộ**
 
@@ -181,11 +390,43 @@ Thống kê định lượng dùng toàn bộ dữ liệu, bỏ NA riêng ở t�
 | is_repeated_guest | 0 | 115,580 | 96.8088 |
 | is_repeated_guest | 1 | 3,810 | 3.1912 |
 
-![distributions](figures/distributions.png)
+### Bảng phụ thuộc và bảng chéo chi tiết
 
-## 5. Mối liên hệ với nhãn và tương tác phân khúc
+Bảng Spearman là tương quan cặp giữa các biến số gốc, dùng các cặp không thiếu. Các phép đo nhiều giá trị 0, category được mã hóa bằng số và dữ liệu lặp có thể làm cách diễn giải khác thường. Không dùng bảng này để tự động loại biến. `market_segment` và `distribution_channel` có thể mô tả chồng lặp; bảng chéo bên dưới kiểm tra cấu trúc thay vì xem hai cột độc lập.
 
-Mẫu số là booking trong từng nhóm; không phải tỷ trọng nhóm trong toàn dữ liệu. Các khoảng Wilson 95% là mô tả tham khảo dưới giả định quan sát độc lập; duplicate, booking theo đoàn và khách lặp có thể làm mức bất định thực tế lớn hơn. Nhóm dưới 100 quan sát được gắn cờ, không xếp hạng chắc chắn. Các liên hệ không phải tác động nhân quả của kênh, đặt cọc hoặc thời gian đặt trước. Bảng hotel × market_segment giúp kiểm tra việc khác cơ cấu khách giữa hai cơ sở.
+**12 cặp số có |rho| lớn nhất trong danh sách công bố**
+
+| column_a | column_b | spearman_rho |
+| --- | --- | --- |
+| lead_time | stays_in_week_nights | 0.2963 |
+| adults | adr | 0.2798 |
+| children | adr | 0.2655 |
+| stays_in_weekend_nights | stays_in_week_nights | 0.2381 |
+| adults | previous_bookings_not_canceled | -0.2096 |
+| adr | total_of_special_requests | 0.1964 |
+| lead_time | adults | 0.1922 |
+| lead_time | previous_bookings_not_canceled | -0.1886 |
+| lead_time | previous_cancellations | 0.1708 |
+| lead_time | stays_in_weekend_nights | 0.1621 |
+| adults | total_of_special_requests | 0.1616 |
+| stays_in_week_nights | adults | 0.153 |
+
+**Market segment × distribution channel**
+
+| market_segment | Corporate | Direct | GDS | TA/TO | Undefined |
+| --- | --- | --- | --- | --- | --- |
+| Aviation | 227 | 0 | 0 | 10 | 0 |
+| Complementary | 89 | 576 | 0 | 78 | 0 |
+| Corporate | 4,788 | 172 | 0 | 335 | 0 |
+| Direct | 90 | 12,276 | 1 | 237 | 2 |
+| Groups | 1,228 | 1,472 | 0 | 17,111 | 0 |
+| Offline TA/TO | 212 | 16 | 45 | 23,946 | 0 |
+| Online TA | 43 | 133 | 147 | 56,153 | 1 |
+| Undefined | 0 | 0 | 0 | 0 | 2 |
+
+### Các bảng quan hệ với nhãn đầy đủ
+
+Các nhóm n nhỏ đã được gắn cờ; bảng chuyển vào phụ lục để thân báo cáo tập trung vào phát hiện.
 
 **Tỷ lệ nhãn 1 theo hotel**
 
@@ -292,9 +533,7 @@ Mẫu số là booking trong từng nhóm; không phải tỷ trọng nhóm tron
 | Resort Hotel | Offline TA/TO | 7,472 | 1,138 | 15.2302 |
 | Resort Hotel | Online TA | 17,729 | 6,248 | 35.2417 |
 
-![target by hotel](figures/target_by_hotel.png)
-
-## 6. Thời gian, mùa vụ và giới hạn đánh giá
+### Các bảng thời gian và drift chi tiết
 
 Ngày đến parse được nằm trong **2015-07-01–2017-08-31**. Đây là thời gian ngày đến, không phải thời gian tạo booking. Các tháng đầu/cuối không bao phủ đủ năm, nên không gộp số booking theo tên tháng rồi kết luận mùa vụ. Đồ thị dưới giữ năm–tháng và tách hai khách sạn. Chưa đủ cơ sở để chọn một cách chia tập cuối cùng: cần định nghĩa t0, nhãn đã trưởng thành và đối tượng còn có thể can thiệp; nếu đánh giá tương lai thì ưu tiên giữ trật tự thời gian, đồng thời kiểm tra duplicate qua các tập.
 
@@ -355,55 +594,42 @@ Ngày đến parse được nằm trong **2015-07-01–2017-08-31**. Đây là t
 | 2017-08 | City Hotel | 3,125 | 1,123 | 35.936 |
 | 2017-08 | Resort Hotel | 1,800 | 693 | 38.5 |
 
-![calendar](figures/calendar.png)
+### Tương quan giữa các chỉ báo thiếu
 
-## 7. Phụ thuộc giữa các biến
+Đây là tương quan của các cờ NA để phát hiện cùng thiếu; không xác định MCAR/MAR/MNAR. Cờ dùng để EDA, không xuất thành feature.
 
-Bảng Spearman là tương quan cặp giữa các biến số gốc, dùng các cặp không thiếu. Các phép đo nhiều giá trị 0, category được mã hóa bằng số và dữ liệu lặp có thể làm cách diễn giải khác thường. Không dùng bảng này để tự động loại biến. `market_segment` và `distribution_channel` có thể mô tả chồng lặp; bảng chéo bên dưới kiểm tra cấu trúc thay vì xem hai cột độc lập.
+**Correlation các chỉ báo NA**
 
-**12 cặp số có |rho| lớn nhất trong danh sách công bố**
+| column | company | agent | country | children |
+| --- | --- | --- | --- | --- |
+| company | 1 | -0.5942 | -0.0828 | 0.0014 |
+| agent | -0.5942 | 1 | 0.1021 | 0.0061 |
+| country | -0.0828 | 0.1021 | 1 | -0.0004 |
+| children | 0.0014 | 0.0061 | -0.0004 | 1 |
 
-| column_a | column_b | spearman_rho |
-| --- | --- | --- |
-| lead_time | stays_in_week_nights | 0.2963 |
-| adults | adr | 0.2798 |
-| children | adr | 0.2655 |
-| stays_in_weekend_nights | stays_in_week_nights | 0.2381 |
-| adults | previous_bookings_not_canceled | -0.2096 |
-| adr | total_of_special_requests | 0.1964 |
-| lead_time | adults | 0.1922 |
-| lead_time | previous_bookings_not_canceled | -0.1886 |
-| lead_time | previous_cancellations | 0.1708 |
-| lead_time | stays_in_weekend_nights | 0.1621 |
-| adults | total_of_special_requests | 0.1616 |
-| stays_in_week_nights | adults | 0.153 |
+### Số nhóm và nhóm hiếm — toàn bộ HOTEL
 
-**Market segment × distribution channel**
+Ngưỡng n<100 là cờ đọc báo cáo, không phải luật gộp category. NA là một nhóm riêng khi có.
 
-| market_segment | Corporate | Direct | GDS | TA/TO | Undefined |
-| --- | --- | --- | --- | --- | --- |
-| Aviation | 227 | 0 | 0 | 10 | 0 |
-| Complementary | 89 | 576 | 0 | 78 | 0 |
-| Corporate | 4,788 | 172 | 0 | 335 | 0 |
-| Direct | 90 | 12,276 | 1 | 237 | 2 |
-| Groups | 1,228 | 1,472 | 0 | 17,111 | 0 |
-| Offline TA/TO | 212 | 16 | 45 | 23,946 | 0 |
-| Online TA | 43 | 133 | 147 | 56,153 | 1 |
-| Undefined | 0 | 0 | 0 | 0 | 2 |
+**Category cardinality**
 
-## 8. Kết luận và câu hỏi còn mở
-
-**Kết luận đã kiểm chứng:** nhãn 1 chiếm 37.04%, gồm hủy và no-show; có 31,994 dòng trùng hoàn toàn; tỷ lệ thay đổi mạnh theo giả định bỏ trùng; hai cơ sở và các kênh có cơ cấu khác nhau. Thông tin trạng thái cuối không thể là đầu vào dự đoán.
-
-**Mức độ phù hợp:** tốt cho nghiên cứu cancellation/no-show ở cấp booking. Chưa đủ để mô tả churn ở cấp khách hàng hoặc mô phỏng chấm điểm ngay lúc tạo booking một cách đáng tin cậy.
-
-**Cần xác minh trước giai đoạn tiếp theo:** (1) thời điểm chấm điểm và tập booking còn hiệu lực; (2) lịch sử giá trị tại t0 cho từng biến, nhất là assigned_room_type, booking_changes, deposit_type, ADR và yêu cầu bổ sung; (3) định danh booking/nhóm để giải thích trùng; (4) ý nghĩa các booking 0 khách/0 đêm và ADR bất thường; (5) phạm vi áp dụng ngoài hai khách sạn.
-
-Không xóa dòng, impute, clipping, encoding, tạo feature hoặc train model trong báo cáo này. Các phân nhóm ngày/tháng và lead time chỉ là bảng thống kê EDA; không được xuất thành tập huấn luyện.
+| column | groups_including_na | groups_under_100 | rows_in_rare_groups | pct_rows_rare |
+| --- | --- | --- | --- | --- |
+| hotel | 2 | 0 | 0 | 0 |
+| market_segment | 8 | 1 | 2 | 0.0017 |
+| distribution_channel | 5 | 1 | 5 | 0.0042 |
+| customer_type | 4 | 0 | 0 | 0 |
+| deposit_type | 3 | 0 | 0 | 0 |
+| meal | 5 | 0 | 0 | 0 |
+| country | 178 | 139 | 2,390 | 2.0018 |
+| reserved_room_type | 10 | 2 | 18 | 0.0151 |
+| assigned_room_type | 12 | 2 | 13 | 0.0109 |
+| agent | 334 | 249 | 5,230 | 4.3806 |
+| company | 353 | 341 | 3,560 | 2.9818 |
 
 ## Tái lập và kiểm soát phạm vi
 
-Chạy notebook theo thứ tự từ đầu, hoặc chạy `python scripts/build_descriptive_reports.py` tại thư mục gốc để dựng lại toàn bộ. Script chỉ đọc CSV raw, viết báo cáo/biểu đồ và lưu notebook trong notebooks/; không sửa raw, không ghi data/processed, không gọi pipeline huấn luyện. Các thời điểm phân tích dùng Asia/Ho_Chi_Minh. SHA-256 ở danh mục file nhận diện nguồn; số dòng theo CSV parser được đối chiếu với data_lines của file chính. Các bảng nhóm chỉ sống trong bộ nhớ để tính EDA. Script thực thi các cell bằng IPython trong cùng tiến trình và lưu output thật vào notebook; không khởi tạo kernel mạng. Phụ thuộc dựng báo cáo gồm pandas, numpy, matplotlib, nbformat và IPython; có thể mở notebook bằng Jupyter để Run All.
+Chạy notebook theo thứ tự từ đầu, hoặc chạy `python scripts/build_descriptive_reports.py` tại thư mục gốc để dựng lại toàn bộ. Script chỉ đọc CSV raw, viết báo cáo/biểu đồ và lưu notebook trong notebooks/; không sửa raw, không ghi data/processed, không gọi pipeline huấn luyện. Các thời điểm phân tích dùng Asia/Ho_Chi_Minh. SHA-256 ở danh mục file nhận diện nguồn; số dòng theo CSV parser được đối chiếu với data_lines của file chính. Các bảng nhóm chỉ sống trong bộ nhớ để tính EDA. Ngày tải raw chưa được ghi nhận; không suy từ mtime/ctime. Hình lấy mẫu dùng seed=42; mẫu nhóm Expedia dùng hash srch_id với modulo 20, không dùng seed ngẫu nhiên và phụ thuộc phiên bản pandas. Script thực thi các cell bằng IPython trong cùng tiến trình và lưu output thật vào notebook; không khởi tạo kernel mạng. Phụ thuộc dựng báo cáo gồm pandas, numpy, matplotlib, nbformat và IPython; có thể mở notebook bằng Jupyter để Run All.
 
 **Môi trường thực thi**
 

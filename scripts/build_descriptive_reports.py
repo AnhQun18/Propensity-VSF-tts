@@ -14,6 +14,13 @@ import hashlib
 import json
 import math
 import platform
+import sys
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -41,9 +48,11 @@ def count(value):
 
 
 def md_table(df):
-    def fmt(v):
+    def fmt(v, column):
         if pd.isna(v):
             return "—"
+        if "year" in str(column).lower() and isinstance(v, (int, float, np.integer, np.floating)) and float(v).is_integer():
+            return str(int(v))
         if isinstance(v, (float, np.floating)):
             return f"{v:,.4f}".rstrip("0").rstrip(".")
         if isinstance(v, (int, np.integer)):
@@ -51,7 +60,7 @@ def md_table(df):
         return str(v).replace("|", "\\|").replace("\n", " ")
     headers = [str(c) for c in df.columns]
     rows = ["| " + " | ".join(headers) + " |", "| " + " | ".join(["---"] * len(headers)) + " |"]
-    rows += ["| " + " | ".join(fmt(v) for v in row) + " |" for row in df.itertuples(index=False, name=None)]
+    rows += ["| " + " | ".join(fmt(v, c) for c, v in zip(df.columns, row)) + " |" for row in df.itertuples(index=False, name=None)]
     return "\n".join(rows)
 
 
@@ -121,6 +130,7 @@ class Report:
     root: Path
     sections: list = field(default_factory=list)
     facts: dict = field(default_factory=dict)
+    figure_notes: dict = field(default_factory=dict)
 
     @property
     def directory(self):
@@ -144,23 +154,47 @@ class Report:
                                     ["numpy", np.__version__], ["matplotlib", matplotlib.__version__],
                                     ["Phương pháp", "Thống kê mô tả, không mô hình"],
                                     ["Chunk CSV lớn", str(CHUNK_SIZE)]], columns=["component", "value"])
-        self.add("reproducibility", "Tái lập và kiểm soát phạm vi", "Chạy notebook theo thứ tự từ đầu, hoặc chạy `python scripts/build_descriptive_reports.py` tại thư mục gốc để dựng lại toàn bộ. Script chỉ đọc CSV raw, viết báo cáo/biểu đồ và lưu notebook trong notebooks/; không sửa raw, không ghi data/processed, không gọi pipeline huấn luyện. Các thời điểm phân tích dùng Asia/Ho_Chi_Minh. SHA-256 ở danh mục file nhận diện nguồn; số dòng theo CSV parser được đối chiếu với data_lines của file chính. Các bảng nhóm chỉ sống trong bộ nhớ để tính EDA. Script thực thi các cell bằng IPython trong cùng tiến trình và lưu output thật vào notebook; không khởi tạo kernel mạng. Phụ thuộc dựng báo cáo gồm pandas, numpy, matplotlib, nbformat và IPython; có thể mở notebook bằng Jupyter để Run All.", [("Môi trường thực thi", environment)])
+        if self.dataset == "AIRBNB":
+            import scipy
+            import nbformat
+            import IPython
+            environment = pd.concat([environment, pd.DataFrame(
+                [["scipy", scipy.__version__], ["nbformat", nbformat.__version__], ["IPython", IPython.__version__]],
+                columns=environment.columns)], ignore_index=True)
+        sampling_note = ("Expedia tính thống kê trên toàn bộ train, gồm quantile tuyến tính, skewness không chệch theo pandas và Spearman xếp hạng trung bình cho ties, loại NA theo từng cặp. Chỉ scatter (tối đa 4.000 điểm) và hình pattern missing (300 dòng) lấy mẫu hiển thị với numpy default_rng, seed=42; các bảng và heatmap tổng hợp dùng toàn bộ train. Cột raw được đệm tạm trên đĩa để giới hạn RAM và xóa sau khi xuất báo cáo; không tạo tập processed. Test chỉ là đối chiếu schema/chất lượng và các phân phối tổng hợp, không dùng tính thống kê train. " if self.dataset == "EXPEDIA" else "Hình lấy mẫu hiển thị dùng seed=42. ")
+        self.add("reproducibility", "Tái lập và kiểm soát phạm vi", "Chạy notebook theo thứ tự từ đầu, hoặc chạy `python scripts/build_descriptive_reports.py --dataset " + self.dataset + "` tại thư mục gốc. Script chỉ đọc CSV raw, viết báo cáo/biểu đồ và lưu notebook trong notebooks/; không sửa raw, không ghi data/processed, không gọi pipeline huấn luyện. Các thời điểm phân tích dùng Asia/Ho_Chi_Minh. SHA-256 ở danh mục file nhận diện nguồn; số dòng theo CSV parser được đối chiếu với data_lines của file chính. Ngày tải raw chưa được ghi nhận; không suy từ mtime/ctime. " + sampling_note + "Script thực thi các cell bằng IPython trong cùng tiến trình và lưu output thật vào notebook; không khởi tạo kernel mạng. Phụ thuộc dựng báo cáo gồm pandas, numpy, scipy, matplotlib, nbformat và IPython; có thể mở notebook bằng Jupyter để Run All.", [("Môi trường thực thi", environment)])
+        if self.dataset == "AIRBNB":
+            from scripts.airbnb_deep_dive import reproducibility_section
+            self.sections[-1] = reproducibility_section(self, environment)
         parts = [f"# {self.title}",
                  "> Phạm vi: EDA trên dữ liệu gốc. Không làm sạch/thay thế dữ liệu, không tạo tập feature, không huấn luyện mô hình.",
                  f"Ngày phân tích: {datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).date().isoformat()}. Đây không phải ngày thu thập dữ liệu."]
-        for s in self.sections:
-            parts.extend([f"## {s['title']}", s["text"]])
+        def render(s, level=2):
+            parts.append(f"{'#'*level} {s['title']}")
+            if s["text"]: parts.append(s["text"])
             for label, table in s["tables"]:
                 parts.extend([f"**{label}**", md_table(table)])
             for p in s["figures"]:
                 parts.append(f"![{p.stem.replace('_', ' ')}](figures/{p.name})")
+                if p.name not in self.figure_notes:
+                    raise ValueError(f"Chart lacks an interpretation: {p}")
+                parts.append(self.figure_notes[p.name])
+            for block in s.get("blocks",[]): render(block,level+1)
+        for s in self.sections: render(s)
         (self.directory / "README.md").write_text("\n\n".join(parts)+"\n", encoding="utf-8")
         (self.directory / "analysis_metadata.json").write_text(json.dumps({
             "dataset": self.dataset, "facts": self.facts,
             "analysis_date": datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date().isoformat(),
             "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            "diagnostics_script_sha256": hashlib.sha256((self.root / "scripts/eda_diagnostics.py").read_bytes()).hexdigest(),
+            **({"airbnb_deep_dive_script_sha256": hashlib.sha256((self.root / "scripts/airbnb_deep_dive.py").read_bytes()).hexdigest()} if self.dataset == "AIRBNB" else {}),
+            **({"full_train_script_sha256": hashlib.sha256((self.root / "scripts/expedia_full_train.py").read_bytes()).hexdigest()} if self.dataset == "EXPEDIA" else {}),
             "environment": dict(environment.itertuples(index=False, name=None)),
             "section_keys": [s["key"] for s in self.sections],
+            "download_date": "not_recorded" if self.dataset == "AIRBNB" else None,
+            "download_date_note": "Người cung cấp xác nhận không lưu ngày tải hoặc mã phiên bản Kaggle, 2026-11-02; định danh bản local bằng SHA-256." if self.dataset == "AIRBNB" else "Chưa được ghi nhận; không suy từ mtime/ctime.",
+            "figure_seed": 42,
+            "figure_notes": self.figure_notes,
         }, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
         return self
 
@@ -168,14 +202,19 @@ class Report:
 def show_section(report, key):
     from IPython.display import Markdown, display, Image
     section = next(s for s in report.sections if s["key"] == key)
-    display(Markdown(section["text"]))
-    for label, table in section["tables"]:
-        display(Markdown(f"**{label}**"))
-        with pd.option_context("display.max_rows", max(100, len(table)), "display.max_columns", 30,
-                               "display.float_format", lambda x: f"{x:,.4f}"):
-            display(table)
-    for p in section["figures"]:
-        display(Image(filename=str(p)))
+    def show(s, nested=False):
+        if nested: display(Markdown(f"### {s['title']}"))
+        if s["text"]: display(Markdown(s["text"]))
+        for label, table in s["tables"]:
+            display(Markdown(f"**{label}**"))
+            with pd.option_context("display.max_rows", max(100, len(table)), "display.max_columns", 30,
+                                   "display.float_format", lambda x: f"{x:,.4f}"):
+                display(table)
+        for p in s["figures"]:
+            display(Image(filename=str(p)))
+            display(Markdown(report.figure_notes[p.name]))
+        for block in s.get("blocks",[]): show(block,True)
+    show(section)
 
 
 def manifest(root, dataset):
@@ -331,6 +370,8 @@ ADR âm/cao hoặc booking 0 đêm/0 khách là trường hợp cần xác minh.
 
 Không xóa dòng, impute, clipping, encoding, tạo feature hoặc train model trong báo cáo này. Các phân nhóm ngày/tháng và lead time chỉ là bảng thống kê EDA; không được xuất thành tập huấn luyện.
 """)
+    from scripts.eda_diagnostics import enrich_hotel
+    enrich_hotel(r,df,arrival)
     return r.publish()
 
 
@@ -355,6 +396,7 @@ AIRBNB_MEANINGS = {
 
 
 def airbnb_report(root):
+    from scripts.airbnb_deep_dive import session_action_counts
     r = Report("AIRBNB", "AIRBNB — Hiểu người dùng mới, booking đầu và độ phủ hành vi", root)
     folder = root/"data/raw/AIRBNB"
     train = pd.read_csv(folder/"train_users_2.csv")
@@ -410,8 +452,8 @@ Ngày hoạt động đầu trước ngày tạo tài khoản được nguồn g
                                "mean": [train.age.mean(), train.loc[train.age.between(16,100),"age"].mean()],
                                "median": [train.age.median(), train.loc[train.age.between(16,100),"age"].median()]})
     fig, ax = plt.subplots(1,2,figsize=(13,4))
-    ax[0].bar(target.country_destination, target.pct_all_users, color=COLORS[0]); ax[0].set(title="First destination labels", ylabel="% of all train users"); ax[0].tick_params(axis="x",rotation=45)
-    ax[1].hist(train.loc[train.age.between(16,100),"age"], bins=35,color=COLORS[1]); ax[1].set(title="Age 16–100: descriptive window only",xlabel="Reported age",ylabel="Users")
+    ax[0].bar(target.country_destination, target.pct_all_users, color=COLORS[0]); ax[0].set(title="Nhãn điểm đến đầu được ghi nhận", xlabel="Nhãn điểm đến", ylabel="Tỷ trọng toàn bộ user train (%)"); ax[0].tick_params(axis="x",rotation=45)
+    ax[1].hist(train.loc[train.age.between(16,100),"age"], bins=35,color=COLORS[1]); ax[1].set(title="Tuổi 16–100: cửa sổ mô tả",xlabel="Tuổi khai báo (năm)",ylabel="Số người dùng")
     fig.tight_layout()
     r.add("distributions", "4. Nhãn, tuổi và phân phối kênh/thiết bị", f"""
 Có booking được ghi nhận: **{count(booked.sum())}/{count(n)} ({pct(booked.mean())})**. Nhóm NDF chiếm **{pct((~booked).mean())}**. Bảng điểm đến trình bày hai mẫu số riêng: toàn bộ người dùng và chỉ người có booking; không nhầm tỷ trọng US trong toàn bộ users với tỷ trọng US trong nhóm đã book.
@@ -424,9 +466,10 @@ Có booking được ghi nhận: **{count(booked.sum())}/{count(n)} ({pct(booked
     rates.append(("Tuổi theo nhãn — NA giữ là nhóm riêng",rate_table(age_diagnostic,"reported_age_group","observed_booking")))
     r.add("target", "5. Quan hệ giữa hồ sơ đăng ký và nhãn", "Mỗi quan sát là một user train. Khoảng Wilson 95% chỉ phản ánh bất định nhị thức dưới giả định độc lập; không bao gồm sai lệch chọn mẫu, nhãn chưa trưởng thành hoặc khác thời gian theo dõi. Các nhóm n<100 cần thận trọng. Chênh lệch booking rate giữa kênh/app/thiết bị là liên hệ quan sát, không chứng minh kênh làm tăng booking. Phân nhóm tuổi phục vụ so sánh EDA, không tạo feature.",rates)
     # All event records; only per-user descriptive aggregates are held in memory.
-    sess_rows=0; sess_missing=None; sess_unique={}; devices={}; actions={}; per_user=[]
+    sess_rows=0; sess_missing=None; sess_unique={}; devices={}; actions={}; per_user=[]; transaction_parts=[]
     elapsed_n=0; elapsed_sum=0.; elapsed_min=np.inf; elapsed_max=-np.inf; elapsed_zero=0; elapsed_negative=0
     for chunk in pd.read_csv(folder/"sessions.csv",chunksize=CHUNK_SIZE):
+        transaction_parts.extend(session_action_counts(chunk))
         sess_rows+=len(chunk)
         miss=chunk.isna().sum(); sess_missing=miss if sess_missing is None else sess_missing.add(miss,fill_value=0)
         for c in chunk.columns:
@@ -438,6 +481,7 @@ Có booking được ghi nhận: **{count(booked.sum())}/{count(n)} ({pct(booked
         if len(s): elapsed_min=min(elapsed_min,float(s.min())); elapsed_max=max(elapsed_max,float(s.max()))
         per_user.append(chunk.groupby("user_id",dropna=True).agg(event_n=("device_type","size"),elapsed_nonnull=("secs_elapsed","count"),elapsed_sum=("secs_elapsed","sum")))
     per_user=pd.concat(per_user).groupby(level=0).sum()
+    transaction_counts=pd.concat(transaction_parts,ignore_index=True).groupby(["user_id","field","value"],observed=True,sort=False).event_n.sum().reset_index()
     ids=set(per_user.index); train_ids=set(train.id); test_ids=set(test.id)
     coverage=pd.DataFrame([["train",len(train),len(ids&train_ids),len(ids&train_ids)/len(train)*100],
                            ["test",len(test),len(ids&test_ids),len(ids&test_ids)/len(test)*100]],columns=["population","users","users_with_sessions","coverage_pct"])
@@ -462,8 +506,12 @@ Có booking được ghi nhận: **{count(booked.sum())}/{count(n)} ({pct(booked
     coverage_target["coverage_pct"]=coverage_target.users_with_sessions/coverage_target.users*100
     r.facts=dict(rows=n,columns=len(train.columns),positive=int(booked.sum()),rate=float(booked.mean()),sessions=sess_rows,session_users=len(ids),train_session_users=len(ids&train_ids),test_session_users=len(ids&test_ids),test_rows=len(test),sessions_missing_ids=int(sess_missing.user_id))
     fig,ax=plt.subplots(1,2,figsize=(12,4))
-    ax[0].bar(coverage.population,coverage.coverage_pct,color=COLORS[:2]); ax[0].set(title="Users with session records",ylabel="% of users",ylim=(0,105))
-    ax[1].bar(yearly.account_year.astype(str),yearly.coverage_pct,color=COLORS[0]); ax[1].set(title="Train session coverage by account year",ylabel="% of users",ylim=(0,105)); fig.tight_layout()
+    year2014=yearly.loc[yearly.account_year.eq(2014)].iloc[0]
+    compare_labels=["Train toàn kỳ","Train năm 2014","Test năm 2014"]
+    compare_values=[coverage.iloc[0].coverage_pct,year2014.coverage_pct,coverage.iloc[1].coverage_pct]
+    ax[0].bar(compare_labels,compare_values,color=[COLORS[0],COLORS[2],COLORS[1]]); ax[0].set(title="Độ phủ sessions: so sánh cùng cohort 2014",xlabel="Quần thể người dùng",ylabel="Người dùng có log (%)",ylim=(0,108)); ax[0].tick_params(axis="x",rotation=15)
+    for i,value in enumerate(compare_values): ax[0].text(i,value+1,f"{value:.2f}%",ha="center")
+    ax[1].bar(yearly.account_year.astype(str),yearly.coverage_pct,color=COLORS[0]); ax[1].set(title="Độ phủ sessions theo năm tạo tài khoản",xlabel="Năm tạo tài khoản train",ylabel="Người dùng có log (%)",ylim=(0,108)); fig.tight_layout()
     r.add("sessions", "6. Sessions: độ phủ, khóa ghép và giới hạn thời gian", f"""
 Đã quét **toàn bộ {count(sess_rows)} sự kiện**, không dùng 500.000 dòng đầu. Có **{count(len(ids))} user_id khác nhau không thiếu**, gồm **{count(len(ids&train_ids))} train** và **{count(len(ids&test_ids))} test**; **{count(len(ids-train_ids-test_ids))} ID** không thuộc cả hai bảng users. Có **{count(sess_missing.user_id)} sự kiện thiếu user_id**, không gán được về người dùng.
 
@@ -476,10 +524,16 @@ Có booking được ghi nhận: **{count(booked.sum())}/{count(n)} ({pct(booked
     cohort=pd.DataFrame({"account_month":account.dt.to_period("M").astype(str),"observed_booking":booked.astype(int)})
     cohort=cohort.groupby("account_month").observed_booking.agg(users="size",booked="sum").reset_index()
     cohort["booked_pct"]=cohort.booked/cohort.users*100
+    cohort["ci95_low_pct"],cohort["ci95_high_pct"]=wilson(cohort.booked,cohort.users)
     range_table=pd.DataFrame([[label,df.date_account_created.min(),df.date_account_created.max(),len(df)] for label,df in [("train",train),("test",test)]],columns=["population","account_min","account_max","users"])
     fig,axes=plt.subplots(2,1,figsize=(13,6),sharex=True)
-    axes[0].plot(cohort.account_month,cohort.users,color=COLORS[0]); axes[0].set(title="Train account cohorts",ylabel="Users")
-    axes[1].plot(cohort.account_month,cohort.booked_pct,color=COLORS[1]); axes[1].set(ylabel="Observed booking (%)",xlabel="Account creation month")
+    x=np.arange(len(cohort))
+    axes[0].bar(x,cohort.users,color=COLORS[0]); axes[0].set(title="Cohort tạo tài khoản trong train",ylabel="Số người dùng")
+    axes[1].errorbar(x,cohort.booked_pct,yerr=np.vstack([cohort.booked_pct-cohort.ci95_low_pct,cohort.ci95_high_pct-cohort.booked_pct]),fmt="o-",markersize=3,capsize=2,color=COLORS[1],label="Tỷ lệ và khoảng Wilson 95%")
+    axes[1].set(ylabel="Có booking được ghi nhận (%)",xlabel="Tháng tạo tài khoản"); axes[1].legend(loc="best")
+    boundary=int(cohort.index[cohort.account_month.eq("2014-01")][0])
+    for axis in axes: axis.axvline(boundary-.5,color=COLORS[2],linestyle="--",linewidth=1)
+    axes[0].text(boundary-.7,axes[0].get_ylim()[1]*.94,"2014-01: bắt đầu có sessions",ha="right",va="top",color=COLORS[2])
     ticks=np.arange(0,len(cohort),3); axes[1].set_xticks(ticks); axes[1].set_xticklabels(cohort.account_month.iloc[ticks],rotation=60); fig.tight_layout()
     r.add("time", "7. Cohort thời gian và thay đổi train–test", "Train và test nối tiếp theo ngày tạo account. Đồ thị booking rate theo cohort phản ánh cả thành phần khách và thời gian có cơ hội được quan sát; không kết luận cohort mới kém chất lượng chỉ từ nhãn. Total variation trong [0,1] so sánh phân phối category (kể cả NA); 0 là giống nhau, 1 là không giao nhau. Đây là mô tả drift, không phải ngưỡng tự động loại biến hoặc chọn mô hình.",[("Khoảng thời gian account",range_table),("Cohort theo tháng — toàn bộ train",cohort),("Khác biệt category giữa train và test",drift_table(train,test,["gender","signup_method","signup_flow","language","affiliate_channel","affiliate_provider","first_affiliate_tracked","signup_app","first_device_type","first_browser"]))],[r.savefig("account_cohorts",fig)])
     aux_schema=pd.DataFrame([
@@ -505,6 +559,8 @@ Có booking được ghi nhận: **{count(booked.sum())}/{count(n)} ({pct(booked
 
 Chưa impute, sửa tuổi, encode, tổng hợp sessions thành tập feature, chọn feature, chia tập huấn luyện hay train model. Mọi bảng nhóm và nhãn nhị phân tạm thời trong code chỉ phục vụ thống kê EDA và không được xuất thành dữ liệu mô hình.
 """)
+    from scripts.eda_diagnostics import enrich_airbnb
+    enrich_airbnb(r,train,test,ids,account,per_user,transaction_counts)
     return r.publish()
 
 
@@ -556,34 +612,36 @@ def _combine_group(parts, keys):
     return pd.concat(parts).groupby(keys,observed=True,dropna=False).sum(numeric_only=True).reset_index()
 
 
-def scan_expedia(path, training):
-    """Exact full-file counts/moments; quantiles only on stable whole-query sample."""
+def scan_expedia(path, training, store=None):
+    """Exact full-file aggregates, plus every train numeric value in a disk cache."""
+    from scripts.expedia_full_train import progress
     rows=0; missing=None; dtypes={}; sums={}; squares={}; ns={}; mins={}; maxs={}
-    samples=[]; query_parts=[]; pairs_a=[]; pairs_b=[]; properties=set(); query_ids=set()
+    query_parts=[]; pairs_a=[]; pairs_b=[]; properties=set(); query_ids=set()
+    numeric_cols=EXPEDIA_NUM+[f"comp{i}_rate_percent_diff" for i in range(1,9)]+(["gross_bookings_usd"] if training else [])
     minimum="9999"; maximum=""; book_no_click=0; booking_missing_gross=0; nonbooking_gross=0; bad_labels=0
     zero_price=0; negative_price=0; high_price=0; very_high_price=0
     cat_cols=["site_id","visitor_location_country_id","prop_country_id","prop_starrating","prop_brand_bool",
               "promotion_flag","srch_saturday_night_bool","random_bool"]
-    cat_parts={c:[] for c in cat_cols}
+    dictionary_categories=cat_cols+["srch_destination_id"]+[f"comp{i}_{kind}" for i in range(1,9) for kind in ["rate","inv"]]+(["position","click_bool","booking_bool"] if training else [])
+    cat_parts={c:[] for c in dictionary_categories}
     group_parts={c:[] for c in cat_cols+["price_group","window_group","year_month","random_bool_position"]} if training else {}
     for chunk in pd.read_csv(path,chunksize=CHUNK_SIZE):
         rows+=len(chunk)
-        print(f"{path.name}: {rows:,} rows",flush=True)
+        progress(f"{path.name}: {rows:,} rows")
         miss=chunk.isna().sum(); missing=miss if missing is None else missing.add(miss,fill_value=0)
         for c in chunk.columns: dtypes.setdefault(c,str(chunk[c].dtype))
         minimum=min(minimum,chunk.date_time.min()); maximum=max(maximum,chunk.date_time.max())
         properties.update(chunk.prop_id.unique()); query_ids.update(chunk.srch_id.unique())
         zero_price+=int(chunk.price_usd.eq(0).sum()); negative_price+=int(chunk.price_usd.lt(0).sum())
         high_price+=int(chunk.price_usd.gt(1000).sum()); very_high_price+=int(chunk.price_usd.gt(10000).sum())
-        for c in EXPEDIA_NUM:
+        for c in numeric_cols:
             v=chunk[c].dropna().to_numpy(dtype=float)
-            ns[c]=ns.get(c,0)+len(v); sums[c]=sums.get(c,0.)+float(v.sum()); squares[c]=squares.get(c,0.)+float(np.dot(v,v))
+            ns[c]=ns.get(c,0)+len(v); sums[c]=sums.get(c,0.)+float(v.sum()); squares[c]=squares.get(c,0.)+float((v*v).sum())
             if len(v): mins[c]=min(mins.get(c,np.inf),float(v.min())); maxs[c]=max(maxs.get(c,-np.inf),float(v.max()))
-        # Hash only srch_id, without row index: all candidates in a query are kept together.
-        sampled=(pd.util.hash_pandas_object(chunk.srch_id,index=False).to_numpy()%20)==0
-        sample_cols=["srch_id"]+EXPEDIA_NUM+(["click_bool","booking_bool"] if training else [])
-        samples.append(chunk.loc[sampled,sample_cols].copy())
-        for c in cat_cols:
+        if training:
+            if store is None: raise ValueError("Full train diagnostics require an exact raw-column cache")
+            store.append(chunk)
+        for c in dictionary_categories:
             vc=chunk[c].value_counts(dropna=False).rename("n").reset_index()
             vc.columns=[c,"n"]; cat_parts[c].append(vc)
         pairs_a.append(chunk.srch_id.to_numpy(copy=True)); pairs_b.append(chunk.prop_id.to_numpy(copy=True))
@@ -592,7 +650,8 @@ def scan_expedia(path, training):
             booking_missing_gross+=int((chunk.booking_bool.eq(1)&chunk.gross_bookings_usd.isna()).sum())
             nonbooking_gross+=int((chunk.booking_bool.eq(0)&chunk.gross_bookings_usd.notna()).sum())
             bad_labels+=int((~chunk.click_bool.isin([0,1])|~chunk.booking_bool.isin([0,1])).sum())
-            query_parts.append(chunk.groupby("srch_id",sort=False).agg(n=("prop_id","size"),clicks=("click_bool","sum"),bookings=("booking_bool","sum"),date_min=("date_time","min"),date_max=("date_time","max")))
+            query_diag=chunk.assign(_date_ns=pd.to_datetime(chunk.date_time,format="%Y-%m-%d %H:%M:%S").astype("int64"))
+            query_parts.append(query_diag.groupby("srch_id",sort=False).agg(n=("prop_id","size"),clicks=("click_bool","sum"),bookings=("booking_bool","sum"),date_min=("_date_ns","min"),date_max=("_date_ns","max")))
             for c in cat_cols:
                 group_parts[c].append(chunk.groupby(c,dropna=False).agg(n=("srch_id","size"),clicks=("click_bool","sum"),bookings=("booking_bool","sum")).reset_index())
             price_group=pd.cut(chunk.price_usd,[-np.inf,0,50,100,150,250,500,1000,np.inf],labels=["<=0","(0,50]","(50,100]","(100,150]","(150,250]","(250,500]","(500,1000]",">1000"])
@@ -602,25 +661,28 @@ def scan_expedia(path, training):
                 group_parts[name].append(tmp.groupby(name,observed=True,dropna=False).agg(n=("srch_id","size"),clicks=("click_bool","sum"),bookings=("booking_bool","sum")).reset_index())
             group_parts["random_bool_position"].append(chunk.groupby(["random_bool","position"],dropna=False).agg(n=("srch_id","size"),clicks=("click_bool","sum"),bookings=("booking_bool","sum")).reset_index())
         else:
-            query_parts.append(chunk.groupby("srch_id",sort=False).agg(n=("prop_id","size"),date_min=("date_time","min"),date_max=("date_time","max")))
+            query_diag=chunk.assign(_date_ns=pd.to_datetime(chunk.date_time,format="%Y-%m-%d %H:%M:%S").astype("int64"))
+            query_parts.append(query_diag.groupby("srch_id",sort=False).agg(n=("prop_id","size"),date_min=("_date_ns","min"),date_max=("_date_ns","max")))
     # Exact pair duplicate check, not a probabilistic hash duplicate count.
     pairs=pd.DataFrame({"srch_id":np.concatenate(pairs_a),"prop_id":np.concatenate(pairs_b)})
     duplicate_pairs=int(pairs.duplicated().sum())
     del pairs,pairs_a,pairs_b
     query=pd.concat(query_parts).groupby(level=0).agg({"n":"sum",**({"clicks":"sum","bookings":"sum"} if training else {}),"date_min":"min","date_max":"max"})
-    sample=pd.concat(samples,ignore_index=True)
     stats=[]
-    for c in EXPEDIA_NUM:
+    for c in numeric_cols:
         vns=ns[c]; mean=sums[c]/vns if vns else np.nan
         std=math.sqrt(max(0,(squares[c]-sums[c]*sums[c]/vns)/(vns-1))) if vns>1 else np.nan
-        q=sample[c].quantile([.01,.25,.5,.75,.95,.99])
-        stats.append([c,vns,mean,std,mins.get(c,np.nan),maxs.get(c,np.nan),*[q.loc[p] for p in [.01,.25,.5,.75,.95,.99]]])
-    stats=pd.DataFrame(stats,columns=["column","full_count_nonnull","full_mean","full_std","full_min","full_max","sample_p1","sample_p25","sample_p50","sample_p75","sample_p95","sample_p99"])
+        stats.append([c,vns,mean,std,mins.get(c,np.nan),maxs.get(c,np.nan)])
+    stats=pd.DataFrame(stats,columns=["column","full_count_nonnull","full_mean","full_std","full_min","full_max"])
+    if training:
+        from scripts.expedia_full_train import full_numeric_statistics
+        store.finish()
+        stats=full_numeric_statistics(store,stats)
     cat={c:_combine_group(parts,[c]) for c,parts in cat_parts.items()}
     groups={c:_combine_group(parts,["random_bool","position"] if c=="random_bool_position" else [c]) for c,parts in group_parts.items()}
     for g in groups.values():
         g["click_pct"]=g.clicks/g.n*100; g["booking_pct"]=g.bookings/g.n*100
-    return dict(rows=rows,missing=missing,dtypes=dtypes,stats=stats,sample=sample,queries=query,
+    return dict(rows=rows,missing=missing,dtypes=dtypes,stats=stats,store=store,queries=query,
                 query_ids=query_ids,properties=properties,cat=cat,groups=groups,min_date=minimum,max_date=maximum,
                 duplicate_pairs=duplicate_pairs,book_no_click=book_no_click,booking_missing_gross=booking_missing_gross,
                 nonbooking_gross=nonbooking_gross,bad_labels=bad_labels,zero_price=zero_price,negative_price=negative_price,
@@ -628,17 +690,30 @@ def scan_expedia(path, training):
 
 
 def expedia_report(root):
+    from scripts.expedia_full_train import TrainColumns
+    inventory=manifest(root,"EXPEDIA")
+    rows=int(inventory.set_index("file").loc["train.csv","data_lines"])
+    numeric=EXPEDIA_NUM+[f"comp{i}_rate_percent_diff" for i in range(1,9)]+["gross_bookings_usd"]
+    with TrainColumns(rows,numeric) as store:
+        return _expedia_report(root,inventory,store)
+
+
+def _expedia_report(root,inventory,store):
     r=Report("EXPEDIA","EXPEDIA — Hiểu tìm kiếm, click và booking ở cấp khách sạn hiển thị",root)
     folder=root/"data/raw/EXPEDIA"
-    train=scan_expedia(folder/"train.csv",True)
+    train=scan_expedia(folder/"train.csv",True,store)
     test=scan_expedia(folder/"test.csv",False)
-    inventory=manifest(root,"EXPEDIA")
+    from scripts.expedia_full_train import exact_spearman
+    train["correlation"],train["correlation_pairs"]=exact_spearman(store)
     n=train["rows"]; query=train["queries"]; groups=train["groups"]
     clicks=int(query.clicks.sum()); bookings=int(query.bookings.sum())
     r.facts=dict(rows=n,columns=len(train["missing"]),test_rows=test["rows"],test_columns=len(test["missing"]),
                  searches=len(query),clicks=clicks,bookings=bookings,click_rate=clicks/n,booking_rate=bookings/n,
                  booking_given_click=bookings/clicks,searches_without_click=int(query.clicks.eq(0).sum()),
-                 duplicate_pairs=train["duplicate_pairs"],test_duplicate_pairs=test["duplicate_pairs"])
+                 duplicate_pairs=train["duplicate_pairs"],test_duplicate_pairs=test["duplicate_pairs"],
+                 statistics_population="full_train",statistics_rows=n,numeric_statistics_columns=len(train["stats"]),
+                 quantile_method="linear; all nonmissing train values",spearman_method="average ranks; pairwise-complete full train",
+                 sampled_statistics=False,display_only_samples={"scatter_max_points":4000,"missing_pattern_rows":300})
     r.add("scope","1. Nguồn, đơn vị quan sát và câu hỏi propensity",f"""
 Schema hiện có thuộc [Personalize Expedia Hotel Searches — ICDM 2013](https://www.kaggle.com/c/expedia-personalized-sort/data), khác cuộc thi Expedia Hotel Recommendations dự đoán hotel cluster. Train có **{count(n)} dòng, 54 cột**; test có **{count(test['rows'])} dòng, 50 cột**. Mỗi dòng là một cặp **search–property**, không phải một khách hàng hoặc một lượt search độc lập.
 
@@ -650,16 +725,23 @@ Câu hỏi EDA: cấu trúc nhóm, quan hệ click–booking, khác biệt tỷ 
     if unknown: raise ValueError(f"Missing Expedia dictionary entries: {unknown}")
     schema=pd.DataFrame([[c,train["dtypes"][c],int(train["missing"][c]),train["missing"][c]/n*100,c in test["missing"].index,*EXPEDIA_MEANINGS[c]] for c in train["missing"].index],columns=["column","pandas_dtype","full_missing_n","full_missing_pct","in_test","meaning","role_or_caution"])
     r.add("dictionary","2. Từ điển đủ 54 cột và schema train–test","Các ID được đọc thành số nhưng mang ý nghĩa phân loại. Nhóm đối thủ có **8 × 3 = 24 cột**, không phải 16. Bốn cột chỉ có ở train là position, click_bool, booking_bool, gross_bookings_usd. Sau khi tách bốn cột này, có 50 cột chung với test; đây là số cột schema, chưa phải số feature được phê duyệt sử dụng. Nếu srch_id chỉ làm khóa nhóm thì còn 49 cột ứng viên; prop_id vẫn cần quyết định cách dùng phù hợp ở giai đoạn sau.",[("Schema và missing toàn bộ train",schema)])
-    sample=train["sample"]
-    sample_check=pd.DataFrame([["train: toàn bộ",n,len(query),clicks/n*100,bookings/n*100],
-                               ["train: mẫu hash theo nhóm",len(sample),sample.srch_id.nunique(),sample.click_bool.mean()*100,sample.booking_bool.mean()*100]],columns=["population","rows","searches","click_pct","booking_pct"])
-    r.add("method","3. Phương pháp tính: toàn bộ dữ liệu và mẫu nhóm",f"""
-**Toàn bộ train và test được quét theo chunk {count(CHUNK_SIZE)} dòng.** Số dòng/nhóm, missing, tỷ lệ nhãn, thống kê mean/std/min/max, phân bố category, bảng nhóm và chuỗi thời gian đều được cộng dồn trên toàn file; không thay toàn bộ dữ liệu bằng 500.000 dòng đầu.
+    coverage=pd.DataFrame([
+        ["Quy mô, khóa, missing, nhãn, category, nhóm, thời gian",n,"Toàn bộ train; không lấy mẫu"],
+        ["Mean/std/min/max, p1/p25/p50/p75/p95/p99, skewness",n,"Toàn bộ giá trị không thiếu của từng biến; count_nonnull tại phụ lục"],
+        ["IQR, số đếm outlier và boxplot",n,"Toàn bộ giá trị không thiếu; giữ nguyên outlier"],
+        ["Spearman của 9 biến công bố",n,"Toàn bộ cặp không thiếu; số dòng từng cặp tại phụ lục"],
+        ["Missing theo booking và tương quan cờ thiếu",n,"Toàn bộ train"],
+        ["Scatter / hình pattern missing",n,"Chỉ hiển thị tối đa 4.000 điểm / 300 dòng; không tính thống kê từ mẫu hiển thị"],
+    ],columns=["analysis","source_train_rows","method"])
+    r.add("method","3. Phương pháp tính: toàn bộ tập train",f"""
+**Mọi thống kê train dùng toàn bộ {count(n)} dòng thuộc {count(len(query))} searches.** CSV được quét theo chunk {count(CHUNK_SIZE)} dòng; cột số raw và cờ NA được đệm tạm trên đĩa để tính chính xác trong RAM giới hạn. Cache bị xóa sau khi xuất báo cáo, không phải tập processed hay feature.
 
-**Chỉ các percentile và biểu đồ phân phối trên mẫu** dùng mẫu xác định bằng `hash_pandas_object(srch_id, index=False) % 20 == 0`, tỷ lệ mục tiêu khoảng 5%. Tất cả khách sạn cùng srch_id được giữ cùng nhau, kể cả khi nhóm vượt ranh giới chunk. Mẫu train thực tế có **{count(len(sample))} dòng / {count(sample.srch_id.nunique())} searches**. Đây là mẫu nhóm bằng hàm băm có thể tái lập, không khẳng định đại diện tuyệt đối hoặc là lấy mẫu ngẫu nhiên đơn từng dòng. Thuật toán hash phụ thuộc phiên bản pandas nên môi trường được ghi ở cuối báo cáo.
+Phân vị dùng nội suy tuyến tính trên toàn bộ giá trị không thiếu; std dùng ddof=1 và skewness không chệch theo pandas. IQR và số đếm outlier dùng cùng quần thể đầy đủ. Spearman tính thứ hạng trung bình khi trùng giá trị, bỏ NA và xếp hạng lại riêng từng cặp. Không dùng quantile sketch hoặc mẫu 5% cho thống kê.
 
-Giá trị `sample_p*` được gắn nhãn riêng, không trộn với thống kê `full_*`. Khóa ghép (srch_id,prop_id) được kiểm tra trùng bằng cặp ID thật, không dùng va chạm hash để kết luận duplicate. Danh mục file có SHA-256 để nhận diện đúng phiên bản nguồn.
-""",[("Đối chiếu mẫu nhóm với toàn bộ train",sample_check)])
+**Chỉ lấy mẫu để hiển thị:** scatter tối đa 4.000 điểm và hình pattern missing 300 dòng, seed=42. Histogram, boxplot, heatmap tương quan, bảng missing theo nhãn và mọi kết luận định lượng dùng toàn bộ train. Phạm vi trục giá 0–1.000 USD chỉ là cửa sổ hiển thị; số dòng ngoài cửa sổ được công bố, không bị xóa khỏi thống kê.
+
+Test được quét đầy đủ để đối chiếu schema, khóa, missing, mean/std/min/max và phân phối category/thời gian; không gộp test vào thống kê train. Khóa ghép (srch_id,prop_id) được kiểm tra bằng cặp ID thật. Danh mục file có SHA-256 để nhận diện phiên bản nguồn.
+""",[("Phạm vi tính toán từng phân tích",coverage)])
     query_summary=pd.DataFrame([["train",len(query),query.n.mean(),query.n.median(),query.n.min(),query.n.max(),int(query.date_min.ne(query.date_max).sum())],
                                 ["test",len(test['queries']),test['queries'].n.mean(),test['queries'].n.median(),test['queries'].n.min(),test['queries'].n.max(),int(test['queries'].date_min.ne(test['queries'].date_max).sum())]],columns=["population","searches","mean_properties","median_properties","min_properties","max_properties","searches_multiple_timestamps"])
     checks=pd.DataFrame([["Train: cặp srch_id-prop_id trùng (beyond first)",train["duplicate_pairs"]],["Test: cặp srch_id-prop_id trùng",test["duplicate_pairs"]],["srch_id xuất hiện cả train và test",len(train["query_ids"]&test["query_ids"])],["prop_id xuất hiện cả train và test",len(train["properties"]&test["properties"])],["Train: search không click",int(query.clicks.eq(0).sum())],["Train: search có >1 booking",int(query.bookings.gt(1).sum())],["Train: booking=1 nhưng click=0",train["book_no_click"]],["Train: booking=1 nhưng gross thiếu",train["booking_missing_gross"]],["Train: booking=0 nhưng gross có giá trị",train["nonbooking_gross"]],["Train: nhãn ngoài {0,1} hoặc thiếu",train["bad_labels"]]],columns=["check","n"])
@@ -678,13 +760,14 @@ Các dòng trong một search phụ thuộc nhau. Vì vậy không đưa khoản
     comp=missing_compare[missing_compare.column.str.startswith("comp")]
     r.add("missing","5. Missing, giá trị đặc biệt và chất lượng giá","Missing được trình bày đủ các cột ở phần schema, với so sánh train–test bên dưới. Nhóm comp có mức thiếu rất khác nhau theo đối thủ và loại thuộc tính; không suy từ top 15 cột thiếu nhiều nhất rằng cả nhóm đều thiếu >93%. Không có dữ liệu đối thủ không chứng minh khách sạn không có đối thủ. Thiếu lịch sử khách không đủ để kết luận khách mới/chưa đăng nhập. Giá 0 và giá cực lớn được định lượng bằng ngưỡng kiểm tra công bố trước; không tự kết luận lỗi, đổi đơn vị hoặc clipping. Định nghĩa giá theo đêm/toàn kỳ chưa được xác minh từ CSV.",[("Toàn bộ 24 cột đối thủ — missing theo tập",comp),("Missing các cột ngoài comp",missing_compare[~missing_compare.column.str.startswith("comp")]),("Kiểm tra đuôi giá trên toàn bộ dữ liệu",price_checks)])
     fig,axes=plt.subplots(1,2,figsize=(13,4))
-    visible=sample.price_usd.between(0,1000)
-    axes[0].hist(sample.loc[visible,"price_usd"],bins=50,color=COLORS[0]); axes[0].set(title=f"Whole-query sample: price 0–1000; {count((~visible).sum())} outside",xlabel="Displayed price (USD)",ylabel="Sample rows")
+    prices=store.arrays["price_usd"]
+    hist,edges=np.histogram(prices,bins=np.linspace(0,1000,51))
+    axes[0].stairs(hist,edges,fill=True,color=COLORS[0]); axes[0].set(title=f"All train prices: 0–1000; {count(n-int(hist.sum()))} outside/NA",xlabel="Displayed price (USD)",ylabel="Train rows")
     axes[1].hist(query.n,bins=np.arange(4.5,float(query.n.max())+1.5),color=COLORS[1]); axes[1].set(title="All train queries: candidate-list sizes",xlabel="Properties per search",ylabel="Searches"); fig.tight_layout()
     cats=[]
     for c,t in train["cat"].items():
         z=t.sort_values("n",ascending=False).head(12).copy(); z["pct_all_rows"]=z.n/n*100; z.insert(0,"column",c); z=z.rename(columns={c:"value"}); cats.append(z)
-    r.add("distributions","6. Phân phối định lượng và phân loại","Các cột full_* dùng toàn bộ dữ liệu. Các cột sample_p* là percentile trên mẫu nhóm đã mô tả, không phải percentile chính xác toàn bộ file. Mean/std có thể rất nhạy với giá cực lớn; đọc cùng median/p95/p99 trên mẫu và full max. Tỷ trọng category dưới đây tính theo cặp search-property, không phải tỷ trọng khách hoặc tỷ trọng search; search có nhiều khách sạn đóng góp nhiều dòng hơn.",[("Train: thống kê toàn bộ và percentile mẫu có nhãn riêng",train["stats"]),("Test: cùng phương pháp thống kê",test["stats"]),("Top 12 category/cột — toàn bộ train",pd.concat(cats,ignore_index=True))],[r.savefig("distributions",fig)])
+    r.add("distributions","6. Phân phối định lượng và phân loại","Mọi cột full_* trong bảng train dùng toàn bộ giá trị không thiếu, gồm cả percentile và skewness. Mean/std nhạy với giá cực lớn; đọc cùng median/p95/p99 và max của cùng quần thể. Bảng có 24 biến định lượng, gồm 8 tỷ lệ chênh giá đối thủ và gross_bookings_usd (cột kết quả, không phải feature). Test chỉ đối chiếu thống kê cơ bản, không tính percentile mẫu. Tỷ trọng category tính theo cặp search-property, không phải khách hoặc search; search nhiều khách sạn đóng góp nhiều dòng hơn.",[("Train: thống kê chính xác toàn bộ giá trị không thiếu",train["stats"]),("Test: đối chiếu count/mean/std/min/max toàn file",test["stats"]),("Top 12 category/cột — toàn bộ train",pd.concat(cats,ignore_index=True))],[r.savefig("distributions",fig)])
     group_tables=[]
     for c in ["prop_starrating","prop_brand_bool","promotion_flag","srch_saturday_night_bool","site_id","price_group","window_group"]:
         t=groups[c].copy(); t["n_under_100"]=t.n<100
@@ -702,17 +785,15 @@ Các dòng trong một search phụ thuộc nhau. Vì vậy không đưa khoản
     temporal=groups["year_month"].sort_values("year_month")
     date_ranges=pd.DataFrame([[pop,s["min_date"],s["max_date"],len(s["queries"])] for pop,s in [("train",train),("test",test)]],columns=["population","min_date_time","max_date_time","searches"])
     tv=[]
-    for c in train["cat"]:
+    for c in sorted(train["cat"].keys() & test["cat"].keys()):
         a=train["cat"][c].set_index(c).n/n; b=test["cat"][c].set_index(c).n/test["rows"]
         idx=a.index.union(b.index); tv.append([c,(a.reindex(idx,fill_value=0)-b.reindex(idx,fill_value=0)).abs().sum()/2,len(b.index.difference(a.index))])
     fig,axes=plt.subplots(2,1,figsize=(12,6),sharex=True)
     axes[0].bar(temporal.year_month,temporal.n,color=COLORS[0]); axes[0].set(title="All train rows by search month",ylabel="Search–property rows")
     axes[1].plot(temporal.year_month,temporal.click_pct,label="Click",color=COLORS[0]); axes[1].plot(temporal.year_month,temporal.booking_pct,label="Booking",color=COLORS[1]); axes[1].set(ylabel="% of rows",xlabel="Search month"); axes[1].legend(); fig.tight_layout()
     r.add("time","9. Thời gian và so sánh train–test","Khoảng thời gian và phân bố category được tính trực tiếp, không giả định test nằm sau train. Tháng đầu/cuối có thể không đầy đủ. Total variation so sánh phân phối category ở cấp dòng, không đại diện đầy đủ cho drift ở cấp search/user. Test không có nhãn nên không tính click/booking rate cho test. Bất kỳ đánh giá tương lai nào ở giai đoạn sau cần giữ nguyên srch_id trong một tập và thiết kế thời gian theo mục tiêu triển khai; chưa thực hiện chia tập ở đây.",[("Khoảng thời gian toàn bộ mỗi tập",date_ranges),("Train: tỷ lệ theo tháng",temporal),("Khác biệt category train–test, toàn bộ dòng",pd.DataFrame(tv,columns=["column","total_variation_0_1","test_only_categories"]).sort_values("total_variation_0_1",ascending=False))],[r.savefig("calendar",fig)])
-    corr_cols=["price_usd","prop_starrating","prop_review_score","prop_location_score1","prop_location_score2","prop_log_historical_price","srch_length_of_stay","srch_booking_window","srch_room_count"]
-    corr=sample[corr_cols].corr(method="spearman")
-    pairs=pd.DataFrame([(a,b,corr.loc[a,b]) for i,a in enumerate(corr_cols) for b in corr_cols[i+1:]],columns=["column_a","column_b","sample_spearman_rho"]).sort_values("sample_spearman_rho",key=abs,ascending=False).head(12)
-    r.add("dependencies","10. Phụ thuộc giữa các biến trên mẫu nhóm","Tương quan Spearman dưới đây dùng mẫu hash theo search và các cặp không thiếu. Đây là kiểm tra mô tả cho một danh sách biến đã công bố, không phải chọn feature. Biến ngữ cảnh được lặp cho nhiều khách sạn cùng search, nên không diễn giải số dòng như số người độc lập. Giá, hạng sao, vị trí và giá lịch sử có thể chứa thông tin chồng lặp; chưa loại hoặc kết hợp cột.",[("12 cặp có |rho| lớn nhất trên mẫu nhóm",pairs)])
+    pairs=train["correlation_pairs"].sort_values("full_spearman_rho",key=abs,ascending=False)
+    r.add("dependencies","10. Phụ thuộc giữa các biến trên toàn bộ train","Spearman dùng toàn bộ dòng không thiếu của từng cặp trong 9 biến công bố, xếp hạng lại sau khi bỏ NA. Số dòng hợp lệ được báo riêng từng cặp. Đây là thống kê mô tả, chưa chọn feature; biến ngữ cảnh lặp cho nhiều khách sạn cùng search nên số dòng không phải số người độc lập. Giá, sao, vị trí và giá lịch sử có thông tin chồng lặp; chưa loại hoặc kết hợp cột.",[("12 cặp có |rho| lớn nhất — toàn bộ train",pairs.head(12)),("Đủ 36 cặp và số dòng không thiếu của từng cặp",pairs)])
     r.add("conclusions","11. Kết luận và câu hỏi còn mở",f"""
 **Đã kiểm chứng trên toàn bộ train:** {count(n)} cặp search-property thuộc {count(len(query))} searches; click {pct(clicks/n)}, booking {pct(bookings/n)}, booking/click {pct(bookings/clicks)}. Không có search hoàn toàn không click trong tập train hiện tại. Số cột đối thủ là 24 và tỷ lệ missing khác nhau mạnh theo đối thủ. Gross bookings là kết quả; position không có trong test.
 
@@ -722,6 +803,8 @@ Các dòng trong một search phụ thuộc nhau. Vì vậy không đưa khoản
 
 Không class weighting, resampling, imputation, clipping, encoding, feature engineering hay train/rank model. Không tạo tập processed hoặc tự quyết định loại cột missing cao. Các câu hỏi và thống kê ở đây phục vụ hiểu dữ liệu trước giai đoạn tiếp theo.
 """)
+    from scripts.eda_diagnostics import enrich_expedia
+    enrich_expedia(r,train,test)
     return r.publish()
 
 
@@ -731,18 +814,71 @@ def build_report(dataset, root):
 
 def make_notebook(root, dataset):
     import nbformat as nbf
-    titles = {
-        "HOTEL": ["1. Bối cảnh, quần thể và câu hỏi phân tích", "2. Từ điển dữ liệu và kiểu dữ liệu thực tế", "3. Chất lượng dữ liệu và định nghĩa nhãn", "4. Phân phối đơn biến và mức độ bao phủ", "5. Mối liên hệ với nhãn và tương tác phân khúc", "6. Thời gian, mùa vụ và giới hạn đánh giá", "7. Phụ thuộc giữa các biến", "8. Kết luận và câu hỏi còn mở", "Tái lập và kiểm soát phạm vi"],
-        "AIRBNB": ["1. Bối cảnh, đơn vị quan sát và phạm vi nhãn", "2. Từ điển users và quan hệ giữa các bảng", "3. Chất lượng users, sentinel và rò rỉ nhãn", "4. Nhãn, tuổi và phân phối kênh/thiết bị", "5. Quan hệ giữa hồ sơ đăng ký và nhãn", "6. Sessions: độ phủ, khóa ghép và giới hạn thời gian", "7. Cohort thời gian và thay đổi train–test", "8. Bảng phụ: từ điển và khả năng ghép", "9. Kết luận và câu hỏi còn mở", "Tái lập và kiểm soát phạm vi"],
-        "EXPEDIA": ["1. Nguồn, đơn vị quan sát và câu hỏi propensity", "2. Từ điển đủ 54 cột và schema train–test", "3. Phương pháp tính: toàn bộ dữ liệu và mẫu nhóm", "4. Cấu trúc nhóm, nhãn và giới hạn quần thể", "5. Missing, giá trị đặc biệt và chất lượng giá", "6. Phân phối định lượng và phân loại", "7. Mối liên hệ với click/booking theo nhóm", "8. Vị trí hiển thị và cơ chế tiếp xúc", "9. Thời gian và so sánh train–test", "10. Phụ thuộc giữa các biến trên mẫu nhóm", "11. Kết luận và câu hỏi còn mở", "Tái lập và kiểm soát phạm vi"],
-    }
-    keys = {
-        "HOTEL": ["scope","dictionary","quality","distributions","target","time","dependencies","conclusions","reproducibility"],
-        "AIRBNB": ["scope","dictionary","quality","distributions","target","sessions","time","auxiliary","conclusions","reproducibility"],
-        "EXPEDIA": ["scope","dictionary","method","quality","missing","distributions","target","position","time","dependencies","conclusions","reproducibility"],
-    }
-    cells = [nbf.v4.new_markdown_cell(f"# {dataset} — Báo cáo hiểu sâu dữ liệu\n\n**Phạm vi: EDA trên dữ liệu gốc; chưa feature engineering, chưa huấn luyện mô hình.**\n\nBáo cáo có từ điển dữ liệu, kiểm tra chất lượng/khóa/nhãn, thống kê theo nhóm, thời gian và giới hạn suy rộng. Các kết quả được tính lại từ CSV; bản đọc nhanh nằm ở `reports/{dataset}/README.md`.\n\nMọi phân nhóm tạm thời chỉ phục vụ mô tả, không tạo tập feature. Chạy tất cả các cell theo thứ tự; cell đầu quét dữ liệu đầy đủ nên có thể mất vài phút với Expedia."),
+    from scripts.eda_diagnostics import SECTION_LAYOUT
+    titles = {dataset: [title for key,title in SECTION_LAYOUT]}
+    keys = {dataset: [key for key,title in SECTION_LAYOUT]}
+    cells = [nbf.v4.new_markdown_cell(f"# {dataset} — Báo cáo hiểu sâu dữ liệu\n\n**Phạm vi: EDA trên dữ liệu gốc; chưa feature engineering, chưa huấn luyện mô hình.**\n\nBáo cáo có từ điển dữ liệu, kiểm tra chất lượng/khóa/nhãn, thống kê theo nhóm, thời gian và giới hạn suy rộng. Các kết quả được tính lại từ CSV; bản đọc nhanh nằm ở `reports/{dataset}/README.md`.\n\nMọi phân nhóm tạm thời chỉ phục vụ mô tả, không tạo tập feature. Chạy tất cả các cell theo thứ tự; cell đầu quét dữ liệu đầy đủ nên có thể mất vài phút với Expedia. Executive summary nằm đầu; bảng kiểm kê dài chuyển sang phụ lục. Mỗi hình có nhận xét riêng ngay bên dưới."),
              nbf.v4.new_code_cell("from pathlib import Path\nimport importlib\nimport sys\n\nPROJECT_ROOT = Path.cwd().resolve()\nwhile not (PROJECT_ROOT / 'data' / 'raw').is_dir():\n    if PROJECT_ROOT == PROJECT_ROOT.parent:\n        raise FileNotFoundError('Không tìm thấy data/raw; hãy mở notebook trong dự án Propensity.')\n    PROJECT_ROOT = PROJECT_ROOT.parent\nif str(PROJECT_ROOT) not in sys.path:\n    sys.path.insert(0, str(PROJECT_ROOT))\nfrom scripts import build_descriptive_reports as eda\nimportlib.reload(eda)\n"+f"report = eda.build_report('{dataset}', PROJECT_ROOT)\n"+"print('Đã tính lại từ CSV raw; số chính:', report.facts)\nprint('Chỉ xuất báo cáo, metadata và biểu đồ; không tạo dữ liệu mô hình.')")]
+    if dataset == "AIRBNB":
+        from scripts.airbnb_deep_dive import AIRBNB_LAYOUT
+        keys[dataset] = [key for key, _ in AIRBNB_LAYOUT]
+        titles[dataset] = [title for _, title in AIRBNB_LAYOUT]
+        introduction = """# AIRBNB — Báo cáo dữ liệu và thiết kế nghiên cứu propensity
+
+**Phạm vi:** EDA trên raw, phân tích nhãn/độ trễ/cohort và đề xuất thiết kế. Chưa làm sạch, tạo feature, tạo tập chia hoặc huấn luyện mô hình.
+
+Notebook có output lưu sẵn để đọc ngay. **Notebook phụ thuộc package scripts/ và CSV của dự án; một file notebook riêng không chạy độc lập.** Khi nộp cần kèm code và hướng dẫn lấy dữ liệu sau:
+
+    Propensity/
+      scripts/
+        __init__.py
+        build_descriptive_reports.py
+        eda_diagnostics.py
+        airbnb_deep_dive.py
+      data/raw/AIRBNB/
+        train_users_2.csv
+        test_users.csv
+        sessions.csv
+        countries.csv
+        age_gender_bkts.csv
+      notebooks/AIRBNB/airbnb_descriptive_report.ipynb
+
+CSV lấy từ cuộc thi Airbnb New User Bookings, không có trong Git. File sample_submission_NDF.csv là tùy chọn để kiểm kê, không dùng phân tích người dùng. Xem báo cáo Markdown được tạo tại reports/AIRBNB/README.md sau khi chạy.
+
+Môi trường EDA đã kiểm tra: Python 3.14.2; pandas 2.3.3, numpy 2.4.1, scipy 1.17.1, matplotlib 3.10.8, nbformat 5.10.4 và IPython 9.9.0. Có thể cài các thư viện EDA trong môi trường riêng bằng:
+
+    python -m pip install pandas==2.3.3 numpy==2.4.1 scipy==1.17.1 matplotlib==3.10.8 nbformat==5.10.4 ipython==9.9.0 tzdata
+
+Dùng Jupyter với kernel của môi trường đó, Restart Kernel và Run All từ đầu; hoặc chạy python scripts/build_descriptive_reports.py --dataset AIRBNB ở thư mục gốc. Lần chạy tạo lại báo cáo, hình và metadata từ CSV; ngày thực thi được lưu trong metadata notebook. Seed hiển thị hình =42. **Ngày tải raw không được lưu**, đã được người cung cấp xác nhận; dùng SHA-256 để đối chiếu snapshot.
+"""
+        setup = """from pathlib import Path
+import importlib
+import sys
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+cwd = Path.cwd().resolve()
+PROJECT_ROOT = next((p for p in (cwd, *cwd.parents)
+                     if (p / 'scripts' / 'build_descriptive_reports.py').is_file()), None)
+if PROJECT_ROOT is None:
+    raise FileNotFoundError('Notebook cần package scripts/ của dự án; xem cấu trúc thư mục trong ô mở đầu.')
+required = [PROJECT_ROOT / 'scripts' / name for name in
+            ['__init__.py', 'build_descriptive_reports.py', 'eda_diagnostics.py', 'airbnb_deep_dive.py']]
+required += [PROJECT_ROOT / 'data' / 'raw' / 'AIRBNB' / name for name in
+             ['train_users_2.csv', 'test_users.csv', 'sessions.csv', 'countries.csv', 'age_gender_bkts.csv']]
+missing = [str(p.relative_to(PROJECT_ROOT)) for p in required if not p.is_file()]
+if missing:
+    raise FileNotFoundError('Thiếu file để chạy lại Airbnb: ' + ', '.join(missing))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+from scripts import build_descriptive_reports as eda
+importlib.reload(eda)
+report = eda.build_report('AIRBNB', PROJECT_ROOT)
+print('Ngày tính lại (Asia/Ho_Chi_Minh):', datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).isoformat())
+print('Đã tính EDA từ CSV raw; số chính:', report.facts)
+print('Không tạo tập feature, tập chia hoặc mô hình. Ngày tải: không được lưu; snapshot theo SHA-256.')
+"""
+        cells = [nbf.v4.new_markdown_cell(introduction), nbf.v4.new_code_cell(setup)]
     for key,title in zip(keys[dataset],titles[dataset]):
         cells += [nbf.v4.new_markdown_cell(f"## {title}"),nbf.v4.new_code_cell(f"eda.show_section(report, '{key}')")]
     nb=nbf.v4.new_notebook(cells=cells)
@@ -756,6 +892,18 @@ def write_summary(root):
     text=f"""# Báo cáo tổng hợp: mức độ phù hợp và hiểu sâu ba bộ dữ liệu
 
 Ngày phân tích: {datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).date().isoformat()}. Phạm vi là dữ liệu CSV hiện có trong dự án, không phải dữ liệu kinh doanh hiện tại. **Chưa feature engineering, chưa làm sạch/thay thế dữ liệu, chưa chia tập huấn luyện, chưa train mô hình.**
+
+## Tóm tắt điều hành — 7 phát hiện có bằng chứng
+
+1. **Ba đơn vị quan sát khác nhau:** HOTEL {count(h['rows'])} booking; AIRBNB {count(a['rows'])} users train; EXPEDIA {count(e['rows'])} cặp search-property. Không so trực tiếp conversion rate giữa ba mẫu số.
+2. **HOTEL nhạy với duplicate:** {count(h['duplicates'])} dòng trùng; tỷ lệ hủy/no-show {pct(h['rate'])} ở raw so với {pct(h['deduplicated_rate'])} nếu giả định bỏ hết trùng. Bảng độ nhạy trong báo cáo HOTEL giải thích giới hạn.
+3. **AIRBNB có leakage rõ:** presence `date_first_booking` khớp hoàn toàn nhãn có booking; không dùng ngày/cờ thiếu làm đầu vào. Xem bảng chéo và heatmap missing của AIRBNB.
+4. **Độ phủ log AIRBNB cần so cùng cohort:** train 2014 {a.get('train_2014_session_coverage_pct',96.5331):.2f}% so với test 2014 {pct(a['test_session_users']/a['test_rows'])}; tỷ lệ train toàn kỳ {pct(a['train_session_users']/a['rows'])} thấp chủ yếu vì cohort 2010–2013 không có log. Sessions chưa được xác nhận trước t0.
+5. **EXPEDIA thiếu quần thể không tương tác:** train có {count(e['searches'])} searches và {count(e['searches_without_click'])} search hoàn toàn không click; không coi CTR {pct(e['click_rate'])} là CTR toàn website.
+6. **Đuôi giá và missing cần quy tắc rõ:** mỗi bộ đã có bảng hàng rào 1,5×IQR, tỷ lệ outlier, heatmap missing và ma trận tương quan. Expedia tính percentile, skewness, outlier, Spearman và missing theo nhãn trên toàn bộ train; chỉ scatter/pattern missing giới hạn số điểm hiển thị. Số liệu nằm cạnh hình ở từng báo cáo.
+7. **Khả năng sử dụng có điều kiện:** HOTEL cho hủy/no-show, AIRBNB cho booking đầu ở cấp user, EXPEDIA cho search/ranking. Tất cả còn câu hỏi về t0/phạm vi áp dụng; ngày tải raw chưa được ghi nhận, giấy phép/điều khoản được trình bày tại nguồn của từng bộ, không gán mặc định quyền sử dụng mở.
+
+Các báo cáo chi tiết cùng cấu trúc: tổng quan nguồn/phiên bản → chất lượng → đơn biến → đa biến/thời gian/nhóm con → rủi ro → kết luận và đề xuất; executive summary ở đầu, từ điển/bảng dài ở phụ lục. Mỗi hình có nhận xét định lượng ngay bên dưới. Đề xuất xử lý thiếu, mã hóa, feature engineering và mô hình chỉ là hướng cho giai đoạn sau, chưa thực hiện.
 
 ## 1. Kết luận phục vụ lựa chọn bài toán
 
@@ -811,14 +959,14 @@ Tỷ lệ theo booking, user và cặp search-property trả lời các câu h�
 ### AIRBNB
 
 - Presence của `date_first_booking` khớp hoàn toàn nhãn có booking trong train, nên không dùng nó hoặc cờ missing của nó làm đầu vào dự đoán hành vi đó.
-- Có {count(a['session_users'])} user_id khác nhau không thiếu trong sessions, không phải tất cả thuộc train. Độ phủ train là {count(a['train_session_users'])}/{count(a['rows'])} ({pct(a['train_session_users']/a['rows'])}); test là {count(a['test_session_users'])}/{count(a['test_rows'])} ({pct(a['test_session_users']/a['test_rows'])}). Có {count(a['sessions_missing_ids'])} sự kiện thiếu user_id.
+- Có {count(a['session_users'])} user_id khác nhau không thiếu trong sessions, không phải tất cả thuộc train. So cùng cohort 2014: train {count(a.get('train_2014_session_users',73815))}/{count(a.get('train_2014_users',76466))} ({a.get('train_2014_session_coverage_pct',96.5331):.2f}%), test {count(a['test_session_users'])}/{count(a['test_rows'])} ({pct(a['test_session_users']/a['test_rows'])}). Tỷ lệ train toàn kỳ {pct(a['train_session_users']/a['rows'])} chịu hiệu ứng thành phần cohort. Có {count(a['sessions_missing_ids'])} sự kiện thiếu user_id.
 - Độ phủ sessions gắn với năm account; thiếu log không đồng nghĩa khách không hoạt động. Logs không có timestamp sự kiện để xác nhận trước t0/booking.
 - NDF không có nghĩa không bao giờ book; chưa có horizon nhãn chung được xác nhận. Nhãn gốc có 12 giá trị, còn 11 giá trị điểm đến/other sau khi chỉ xét người có booking.
 - Bảng quốc gia không được ghép bằng nhãn thật để dự đoán chính nhãn đó; bảng tuổi–giới tính là tổng hợp, không phải user bổ sung.
 
 ### EXPEDIA
 
-- Đã quét toàn bộ {count(e['rows'])} dòng train và {count(e['test_rows'])} dòng test. Percentile trên mẫu được gắn nhãn riêng; không gọi 500.000 dòng đầu là mẫu ngẫu nhiên.
+- Đã quét toàn bộ {count(e['rows'])} dòng train và {count(e['test_rows'])} dòng test. Toàn bộ thống kê train, gồm percentile, skewness, outlier, missing theo nhãn và tương quan, dùng đầy đủ các dòng hợp lệ. Test chỉ đối chiếu schema/chất lượng và phân phối tổng hợp.
 - Train có {count(e['searches'])} searches, **{count(e['searches_without_click'])} search không click**. Không suy rộng tỷ lệ trong tập thành tỷ lệ tương tác của toàn website; cần xác minh cơ chế chọn mẫu.
 - `gross_bookings_usd` là kết quả sau booking. `position` không có trong test; click tương lai không phải feature để chấm trước click.
 - Nhóm đối thủ có 24 cột và mức thiếu khác nhau đáng kể, không phải toàn bộ đều thiếu 93–98%. Không khẳng định NA lịch sử = khách mới hoặc NA đối thủ = không có cạnh tranh.
@@ -828,7 +976,7 @@ Tỷ lệ theo booking, user và cặp search-property trả lời các câu h�
 
 **HOTEL/AIRBNB:** thống kê mô tả trên toàn bộ bảng chính; AIRBNB quét toàn bộ sessions. Khoảng Wilson 95% trong bảng tỷ lệ user/booking là tham khảo theo giả định độc lập, không bao gồm mọi sai lệch dữ liệu. Nhóm n<100 được gắn cờ, không kết luận chắc chắn từ tỷ lệ cực đoan.
 
-**EXPEDIA:** số dòng/nhóm, nhãn, missing, mean/std/min/max, category và chuỗi thời gian dùng toàn file. Percentile và một phần phân tích phụ thuộc dùng mẫu hash khoảng 5% theo srch_id, giữ toàn bộ ứng viên của search. Tỷ lệ thực tế của mẫu và đối chiếu với train đầy đủ được công bố. Không có giả định đại diện tuyệt đối; không báo khoảng nhị thức coi impressions là độc lập.
+**EXPEDIA:** mọi thống kê train dùng toàn bộ dòng hợp lệ của từng biến/cặp biến, gồm quantile tuyến tính, skewness, hàng rào/số đếm outlier, Spearman và missing theo booking. Số dòng không thiếu được công bố; không lấy mẫu 5% để tính thống kê. Chỉ scatter hiển thị tối đa 4.000 điểm và pattern missing 300 dòng, seed=42; heatmap và bảng tổng hợp dùng toàn bộ train. Các dòng cùng search phụ thuộc nhau; không báo khoảng nhị thức coi impressions là độc lập.
 
 Phân nhóm tuổi, lead time, giá hoặc cohort chỉ nhằm đọc dữ liệu. Không có tập feature được xuất, không impute, clipping, encoding, class weighting, resampling hoặc train model. Không có kết quả mô hình để báo AUC, calibration hoặc lift; việc thiếu các chỉ số mô hình không phải thiếu sót của giai đoạn EDA này.
 
@@ -836,7 +984,7 @@ Phân nhóm tuổi, lead time, giá hoặc cohort chỉ nhằm đọc dữ liệ
 
 | Vấn đề | HOTEL | AIRBNB | EXPEDIA |
 | --- | --- | --- | --- |
-| t0 và đối tượng được chấm | Lúc tạo booking hay trước đến; booking nào còn hiệu lực? | Lúc signup hay sau một cửa sổ quan sát? | Trước hiển thị, trước click hay sau click? |
+| t0 và đối tượng được chấm | Lúc tạo booking hay trước đến; booking nào còn hiệu lực? | Thiết kế chính: ngay sau tạo account; cần xác minh snapshot hồ sơ | Trước hiển thị, trước click hay sau click? |
 | Horizon/độ trưởng thành nhãn | Theo vòng đời booking; tránh đưa kết quả đã biết vào risk set | Cần ngày đóng nhãn và thời hạn chung | Nhãn trong search và cách quy thuộc booking |
 | Khả dụng biến tại t0 | Cần log lịch sử/snapshot | Cần chứng minh cửa sổ sessions và bảng phụ | Cần xác minh điểm nội bộ, giá và metadata hiển thị |
 | Định danh/phụ thuộc | Thiếu booking/customer ID | Users rõ khóa; events không có timestamp | Có search/property, thiếu user ID |
@@ -866,6 +1014,7 @@ python scripts/build_descriptive_reports.py --dataset AIRBNB
 
 
 def main():
+    import sys
     import nbformat
     from IPython.core.interactiveshell import InteractiveShell
     from IPython.utils.capture import capture_output
@@ -874,6 +1023,8 @@ def main():
     parser.add_argument("--dataset",choices=["HOTEL","AIRBNB","EXPEDIA"])
     args=parser.parse_args()
     root=Path(__file__).resolve().parents[1]
+    if str(root) not in sys.path:
+        sys.path.insert(0,str(root))
     selected=[args.dataset] if args.dataset else ["HOTEL","AIRBNB","EXPEDIA"]
     shell_config=Config()
     shell_config.HistoryManager.hist_file=":memory:"
@@ -902,6 +1053,7 @@ def main():
             cell.outputs=outputs
             print(f"{dataset}: executed cell {execution_count}",flush=True)
         nb.metadata["execution_method"]="IPython in-process; real cell execution and captured rich outputs"
+        nb.metadata["execution_date"] = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).isoformat()
         nbformat.validate(nb)
         errors=[o for c in nb.cells if c.cell_type=="code" for o in c.get("outputs",[]) if o.output_type=="error"]
         if errors: raise RuntimeError(f"Notebook {dataset} contains execution errors")

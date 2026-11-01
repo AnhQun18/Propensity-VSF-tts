@@ -13,10 +13,92 @@
     "booking_given_click": 0.6234177500495862,
     "searches_without_click": 0,
     "duplicate_pairs": 0,
-    "test_duplicate_pairs": 0
+    "test_duplicate_pairs": 0,
+    "statistics_population": "full_train",
+    "statistics_rows": 9917530,
+    "numeric_statistics_columns": 24,
+    "quantile_method": "linear; all nonmissing train values",
+    "spearman_method": "average ranks; pairwise-complete full train",
+    "sampled_statistics": false,
+    "display_only_samples": {
+      "scatter_max_points": 4000,
+      "missing_pattern_rows": 300
+    },
+    "full_train_price": {
+      "full_count_nonnull": 9917530.0,
+      "full_mean": 241.78252098556803,
+      "full_std": 14341.809541937062,
+      "full_min": 0.0,
+      "full_max": 19726328.0,
+      "full_p1": 34.0,
+      "full_p25": 85.0,
+      "full_p50": 122.07,
+      "full_p75": 185.0,
+      "full_p95": 356.0,
+      "full_p99": 599.0,
+      "full_skewness": 541.4244750273123
+    },
+    "full_train_outliers": [
+      {
+        "column": "price_usd",
+        "population": "toàn bộ train",
+        "nonnull_n": 9917530,
+        "q1": 85.0,
+        "q3": 185.0,
+        "iqr": 100.0,
+        "lower_fence": -65.0,
+        "upper_fence": 335.0,
+        "flagged_n": 586503,
+        "flagged_pct_nonnull": 5.91380111781865,
+        "iqr_zero": false
+      },
+      {
+        "column": "srch_booking_window",
+        "population": "toàn bộ train",
+        "nonnull_n": 9917530,
+        "q1": 4.0,
+        "q3": 49.0,
+        "iqr": 45.0,
+        "lower_fence": -63.5,
+        "upper_fence": 116.5,
+        "flagged_n": 829119,
+        "flagged_pct_nonnull": 8.360136041937862,
+        "iqr_zero": false
+      },
+      {
+        "column": "srch_length_of_stay",
+        "population": "toàn bộ train",
+        "nonnull_n": 9917530,
+        "q1": 1.0,
+        "q3": 3.0,
+        "iqr": 2.0,
+        "lower_fence": -2.0,
+        "upper_fence": 6.0,
+        "flagged_n": 465314,
+        "flagged_pct_nonnull": 4.691833551297551,
+        "iqr_zero": false
+      }
+    ],
+    "full_train_price_star_spearman": 0.5522634711233375,
+    "spearman_variables": [
+      "price_usd",
+      "prop_starrating",
+      "prop_review_score",
+      "prop_location_score1",
+      "prop_location_score2",
+      "prop_log_historical_price",
+      "srch_length_of_stay",
+      "srch_booking_window",
+      "srch_room_count"
+    ],
+    "figure_seed": 42,
+    "download_date": null,
+    "rules_checked_on": "2026-11-01"
   },
   "analysis_date": "2026-11-01",
-  "script_sha256": "9237b2c2a4585441ba5f155529eb742609158191628aab6976abd22ba5ad6716",
+  "script_sha256": "31eec886e8715e1d24423d34227d9f4ebfa31723cdf2c4b0dddcd6e74d1e244b",
+  "diagnostics_script_sha256": "25d76cae62b2932b9aa90733451f89e9702c29e9a8bb6a652c1a4f8dc7b4f295",
+  "full_train_script_sha256": "994a5145acaecd47ec450d0d808605762e91c7ffce1b1cc5d2a80ee7eb3964e3",
   "environment": {
     "Python": "3.14.2",
     "pandas": "2.3.3",
@@ -26,21 +108,26 @@
     "Chunk CSV lớn": "250000"
   },
   "section_keys": [
-    "scope",
-    "dictionary",
-    "method",
-    "quality",
-    "missing",
-    "distributions",
-    "target",
-    "position",
-    "time",
-    "dependencies",
-    "conclusions",
+    "executive",
+    "overview",
+    "quality_main",
+    "univariate",
+    "multivariate_main",
+    "risks",
+    "conclusion_main",
+    "appendix",
     "reproducibility"
   ],
-  "runner_only_revision": {
-    "current_script_sha256": "73fe6d5ae93ea267b8307796b75078326061f2c6fc4f2a2c6cb5e544f5e224bc",
-    "change": "IPython history đặt trong RAM để tránh ghi history ngoài workspace trên Windows. Đã kiểm tra capture stdout, Markdown và DataFrame; không thay đổi các hàm EDA hoặc kết quả đã thực thi."
+  "download_date": null,
+  "download_date_note": "Chưa được ghi nhận; không suy từ mtime/ctime.",
+  "figure_seed": 42,
+  "figure_notes": {
+    "missing_patterns.png": "Nhận xét: comp1_rate_percent_diff thiếu 98.14% trên toàn bộ train; chênh lệch missing lớn nhất giữa hai nhãn là 99.9996 điểm phần trăm ở gross_bookings_usd. Bảng tỷ lệ, số đếm và tương quan cờ thiếu dùng đủ 9,917,530 dòng. Chỉ hình pattern bên trái hiển thị 300 dòng, seed=42, sắp theo pattern, không theo thời gian. Ô xanh là NA. Không suy cơ chế MCAR/MAR/MNAR từ hình; cờ thiếu gross booking vẫn tiết lộ kết quả.",
+    "outliers_and_target.png": "Nhận xét: theo hàng rào Q1−1,5×IQR và Q3+1,5×IQR, price_usd có 586,503/9,917,530 giá trị bị gắn cờ (5.91%) trong toàn bộ train; đây là bất thường thống kê, chưa phải lỗi nhập liệu. Median srch_booking_window theo nhãn: 0=17.00, 1=13.00. Boxplot bên phải ẩn các điểm ngoài whisker để đọc vùng giữa, không xóa chúng khỏi bảng hay raw. Đơn vị xem từ điển; IQR=0 ở biến rời rạc có thể gắn cờ nhiều giá trị thật. Trục x boxplot raw dùng symlog; hàng rào IQR vẫn tính trên giá trị raw, không phải log.",
+    "multivariate.png": "Nhận xét: Spearman giá–hạng sao trên toàn bộ cặp hợp lệ của train là 0.552; cặp có |rho| lớn nhất trong ma trận là price_usd–prop_log_historical_price (rho=0.570, n=9,917,530). Ma trận tính lại thứ hạng trên các dòng không thiếu của từng cặp; số dòng từng cặp ở phụ lục. Scatter chỉ hiển thị tối đa 4.000 điểm, seed=42, trục y symlog để đọc đuôi dài. Không biến đổi raw, không chọn feature hoặc kết luận nhân quả/đa cộng tuyến từ tương quan.",
+    "categories_and_target.png": "Nhận xét: trong toàn bộ train, nhóm prop_starrating=4 có booking rate cao nhất trong bảng (3.34%, n=3,045,848); các nhóm có quy mô khác nhau. Mã 0 cần xác minh nghĩa, không mặc định là chất lượng bằng 0; chênh lệch không được điều chỉnh theo giá/vị trí.",
+    "distributions.png": "Nhận xét: trên toàn bộ train, giá có mean 241.78 USD, median 122.07 USD và max 19726328.00 USD, cho thấy đuôi phải lớn. Histogram đếm tất cả giá trong 0–1.000 USD; 27,018 dòng trên 1.000 USD vẫn nằm trong thống kê/boxplot. Phân phối số ứng viên dùng đủ 399,344 searches.",
+    "position.png": "Nhận xét: tại vị trí nhỏ nhất quan sát được, random_bool=0: click 21.55%, booking 19.49%, n=277,662; random_bool=1: click 14.20%, booking 1.84%, n=120,907. Chênh lệch giữa các cơ chế xếp hạng và sự phụ thuộc theo vị trí cho thấy CTR không chỉ phản ánh sở thích; đây chưa phải ước lượng nhân quả của thứ hạng.",
+    "calendar.png": "Nhận xét: tỷ lệ click theo tháng dao động 4.37–4.56%, booking 2.63–2.86% trong train. Khoảng thời gian chưa đủ nhiều chu kỳ năm để khẳng định mùa vụ bền vững; quy mô dòng còn phụ thuộc số property/search."
   }
 }

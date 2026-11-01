@@ -31,6 +31,8 @@ data/raw/
 
 Các file submission/benchmark không phải dữ liệu huấn luyện bổ sung. Danh mục, số dòng, kích thước chính xác theo byte và SHA-256 của dữ liệu đã phân tích được ghi trong [các báo cáo](../reports/README.md). Đối chiếu các thông tin này để tránh dùng nhầm phiên bản hoặc nhầm cuộc thi Expedia.
 
+Ngày tải dữ liệu gốc chưa được ghi nhận; ngày phân tích và ngày sửa file không thay thế được thông tin đó. Quyền sử dụng cần đối chiếu theo từng nguồn: [Airbnb Competition Rules](https://www.kaggle.com/competitions/airbnb-recruiting-new-user-bookings/rules) có giới hạn về mục đích và phân phối; [Expedia Official Rules](https://storage.googleapis.com/kaggle-media/competitions/kaggle/3504/media/Expedia%20Personalized%20Sort%20Official%20Competition%20Rules%20Final.pdf) không phải giấy phép dữ liệu mở. Báo cáo từng bộ ghi rõ phần đã xác minh và phần chưa có bằng chứng; không mặc định dữ liệu tải công khai được phép công bố lại.
+
 Sau khi có dữ liệu, chạy từ thư mục gốc:
 
 ```powershell
@@ -38,6 +40,8 @@ python scripts/build_descriptive_reports.py
 ```
 
 Script chỉ thực hiện EDA và dựng báo cáo; không tạo tập feature hay huấn luyện mô hình.
+
+Riêng AIRBNB, người cung cấp xác nhận ngày 2026-11-02 rằng ngày tải và mã phiên bản Kaggle không được lưu. Báo cáo dùng trạng thái “không được lưu” cùng SHA-256 từng CSV và hash danh mục local; không điền ngày phân tích hoặc ngày sửa file thay ngày tải. Chạy riêng Airbnb bằng python scripts/build_descriptive_reports.py --dataset AIRBNB; notebook cần package scripts/ và năm CSV phân tích được liệt kê trong ô mở đầu.
 
 ## Khả năng đưa CSV lên GitHub
 

@@ -16,7 +16,7 @@ pyyaml>=6.0.0
 pyarrow>=14.0.0
 
 # Visualization & Reporting
-matplotlib>=3.7.0
+matplotlib>=3.10.0
 seaborn>=0.12.0
 
 # Development & Notebooks

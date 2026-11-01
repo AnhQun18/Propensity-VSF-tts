@@ -1,6 +1,18 @@
 # Báo cáo tổng hợp: mức độ phù hợp và hiểu sâu ba bộ dữ liệu
 
-Ngày phân tích: 2026-11-01. Phạm vi là dữ liệu CSV hiện có trong dự án, không phải dữ liệu kinh doanh hiện tại. **Chưa feature engineering, chưa làm sạch/thay thế dữ liệu, chưa chia tập huấn luyện, chưa train mô hình.**
+Ngày phân tích: 2026-11-02. Phạm vi là dữ liệu CSV hiện có trong dự án, không phải dữ liệu kinh doanh hiện tại. **Chưa feature engineering, chưa làm sạch/thay thế dữ liệu, chưa chia tập huấn luyện, chưa train mô hình.**
+
+## Tóm tắt điều hành — 7 phát hiện có bằng chứng
+
+1. **Ba đơn vị quan sát khác nhau:** HOTEL 119,390 booking; AIRBNB 213,451 users train; EXPEDIA 9,917,530 cặp search-property. Không so trực tiếp conversion rate giữa ba mẫu số.
+2. **HOTEL nhạy với duplicate:** 31,994 dòng trùng; tỷ lệ hủy/no-show 37.04% ở raw so với 27.49% nếu giả định bỏ hết trùng. Bảng độ nhạy trong báo cáo HOTEL giải thích giới hạn.
+3. **AIRBNB có leakage rõ:** presence `date_first_booking` khớp hoàn toàn nhãn có booking; không dùng ngày/cờ thiếu làm đầu vào. Xem bảng chéo và heatmap missing của AIRBNB.
+4. **Độ phủ log AIRBNB cần so cùng cohort:** train 2014 96.53% so với test 2014 99.31%; tỷ lệ train toàn kỳ 34.58% thấp chủ yếu vì cohort 2010–2013 không có log. Sessions chưa được xác nhận trước t0.
+5. **EXPEDIA thiếu quần thể không tương tác:** train có 399,344 searches và 0 search hoàn toàn không click; không coi CTR 4.47% là CTR toàn website.
+6. **Đuôi giá và missing cần quy tắc rõ:** mỗi bộ đã có bảng hàng rào 1,5×IQR, tỷ lệ outlier, heatmap missing và ma trận tương quan. Expedia tính percentile, skewness, outlier, Spearman và missing theo nhãn trên toàn bộ train; chỉ scatter/pattern missing giới hạn số điểm hiển thị. Số liệu nằm cạnh hình ở từng báo cáo.
+7. **Khả năng sử dụng có điều kiện:** HOTEL cho hủy/no-show, AIRBNB cho booking đầu ở cấp user, EXPEDIA cho search/ranking. Tất cả còn câu hỏi về t0/phạm vi áp dụng; ngày tải raw chưa được ghi nhận, giấy phép/điều khoản được trình bày tại nguồn của từng bộ, không gán mặc định quyền sử dụng mở.
+
+Các báo cáo chi tiết cùng cấu trúc: tổng quan nguồn/phiên bản → chất lượng → đơn biến → đa biến/thời gian/nhóm con → rủi ro → kết luận và đề xuất; executive summary ở đầu, từ điển/bảng dài ở phụ lục. Mỗi hình có nhận xét định lượng ngay bên dưới. Đề xuất xử lý thiếu, mã hóa, feature engineering và mô hình chỉ là hướng cho giai đoạn sau, chưa thực hiện.
 
 ## 1. Kết luận phục vụ lựa chọn bài toán
 
@@ -56,14 +68,14 @@ Tỷ lệ theo booking, user và cặp search-property trả lời các câu h�
 ### AIRBNB
 
 - Presence của `date_first_booking` khớp hoàn toàn nhãn có booking trong train, nên không dùng nó hoặc cờ missing của nó làm đầu vào dự đoán hành vi đó.
-- Có 135,483 user_id khác nhau không thiếu trong sessions, không phải tất cả thuộc train. Độ phủ train là 73,815/213,451 (34.58%); test là 61,668/62,096 (99.31%). Có 34,496 sự kiện thiếu user_id.
+- Có 135,483 user_id khác nhau không thiếu trong sessions, không phải tất cả thuộc train. So cùng cohort 2014: train 73,815/76,466 (96.53%), test 61,668/62,096 (99.31%). Tỷ lệ train toàn kỳ 34.58% chịu hiệu ứng thành phần cohort. Có 34,496 sự kiện thiếu user_id.
 - Độ phủ sessions gắn với năm account; thiếu log không đồng nghĩa khách không hoạt động. Logs không có timestamp sự kiện để xác nhận trước t0/booking.
 - NDF không có nghĩa không bao giờ book; chưa có horizon nhãn chung được xác nhận. Nhãn gốc có 12 giá trị, còn 11 giá trị điểm đến/other sau khi chỉ xét người có booking.
 - Bảng quốc gia không được ghép bằng nhãn thật để dự đoán chính nhãn đó; bảng tuổi–giới tính là tổng hợp, không phải user bổ sung.
 
 ### EXPEDIA
 
-- Đã quét toàn bộ 9,917,530 dòng train và 6,622,629 dòng test. Percentile trên mẫu được gắn nhãn riêng; không gọi 500.000 dòng đầu là mẫu ngẫu nhiên.
+- Đã quét toàn bộ 9,917,530 dòng train và 6,622,629 dòng test. Toàn bộ thống kê train, gồm percentile, skewness, outlier, missing theo nhãn và tương quan, dùng đầy đủ các dòng hợp lệ. Test chỉ đối chiếu schema/chất lượng và phân phối tổng hợp.
 - Train có 399,344 searches, **0 search không click**. Không suy rộng tỷ lệ trong tập thành tỷ lệ tương tác của toàn website; cần xác minh cơ chế chọn mẫu.
 - `gross_bookings_usd` là kết quả sau booking. `position` không có trong test; click tương lai không phải feature để chấm trước click.
 - Nhóm đối thủ có 24 cột và mức thiếu khác nhau đáng kể, không phải toàn bộ đều thiếu 93–98%. Không khẳng định NA lịch sử = khách mới hoặc NA đối thủ = không có cạnh tranh.
@@ -73,7 +85,7 @@ Tỷ lệ theo booking, user và cặp search-property trả lời các câu h�
 
 **HOTEL/AIRBNB:** thống kê mô tả trên toàn bộ bảng chính; AIRBNB quét toàn bộ sessions. Khoảng Wilson 95% trong bảng tỷ lệ user/booking là tham khảo theo giả định độc lập, không bao gồm mọi sai lệch dữ liệu. Nhóm n<100 được gắn cờ, không kết luận chắc chắn từ tỷ lệ cực đoan.
 
-**EXPEDIA:** số dòng/nhóm, nhãn, missing, mean/std/min/max, category và chuỗi thời gian dùng toàn file. Percentile và một phần phân tích phụ thuộc dùng mẫu hash khoảng 5% theo srch_id, giữ toàn bộ ứng viên của search. Tỷ lệ thực tế của mẫu và đối chiếu với train đầy đủ được công bố. Không có giả định đại diện tuyệt đối; không báo khoảng nhị thức coi impressions là độc lập.
+**EXPEDIA:** mọi thống kê train dùng toàn bộ dòng hợp lệ của từng biến/cặp biến, gồm quantile tuyến tính, skewness, hàng rào/số đếm outlier, Spearman và missing theo booking. Số dòng không thiếu được công bố; không lấy mẫu 5% để tính thống kê. Chỉ scatter hiển thị tối đa 4.000 điểm và pattern missing 300 dòng, seed=42; heatmap và bảng tổng hợp dùng toàn bộ train. Các dòng cùng search phụ thuộc nhau; không báo khoảng nhị thức coi impressions là độc lập.
 
 Phân nhóm tuổi, lead time, giá hoặc cohort chỉ nhằm đọc dữ liệu. Không có tập feature được xuất, không impute, clipping, encoding, class weighting, resampling hoặc train model. Không có kết quả mô hình để báo AUC, calibration hoặc lift; việc thiếu các chỉ số mô hình không phải thiếu sót của giai đoạn EDA này.
 
@@ -81,7 +93,7 @@ Phân nhóm tuổi, lead time, giá hoặc cohort chỉ nhằm đọc dữ liệ
 
 | Vấn đề | HOTEL | AIRBNB | EXPEDIA |
 | --- | --- | --- | --- |
-| t0 và đối tượng được chấm | Lúc tạo booking hay trước đến; booking nào còn hiệu lực? | Lúc signup hay sau một cửa sổ quan sát? | Trước hiển thị, trước click hay sau click? |
+| t0 và đối tượng được chấm | Lúc tạo booking hay trước đến; booking nào còn hiệu lực? | Thiết kế chính: ngay sau tạo account; cần xác minh snapshot hồ sơ | Trước hiển thị, trước click hay sau click? |
 | Horizon/độ trưởng thành nhãn | Theo vòng đời booking; tránh đưa kết quả đã biết vào risk set | Cần ngày đóng nhãn và thời hạn chung | Nhãn trong search và cách quy thuộc booking |
 | Khả dụng biến tại t0 | Cần log lịch sử/snapshot | Cần chứng minh cửa sổ sessions và bảng phụ | Cần xác minh điểm nội bộ, giá và metadata hiển thị |
 | Định danh/phụ thuộc | Thiếu booking/customer ID | Users rõ khóa; events không có timestamp | Có search/property, thiếu user ID |
