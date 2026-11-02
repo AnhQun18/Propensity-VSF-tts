@@ -1,45 +1,77 @@
-# AIRBNB — Hiểu người dùng mới, booking đầu và độ phủ hành vi
+# AIRBNB — Hiểu người dùng mới, lượt đặt chỗ đầu tiên và độ phủ hành vi
 
 > Phạm vi: EDA trên dữ liệu gốc. Không làm sạch/thay thế dữ liệu, không tạo tập feature, không huấn luyện mô hình.
 
 Ngày phân tích: 2026-11-02. Đây không phải ngày thu thập dữ liệu.
 
+## Thuật ngữ và cách đọc báo cáo
+
+Mọi số liệu trong báo cáo là thống kê mô tả từ dữ liệu gốc. Chúng cho biết các liên hệ trong mẫu, chưa phải kết quả dự báo hoặc bằng chứng về tác động nhân quả. Báo cáo dừng ở EDA và thiết kế thí nghiệm, chưa xử lý dữ liệu cho mô hình hoặc huấn luyện mô hình.
+
+Báo cáo dùng thống nhất “nhãn y” cho mục tiêu nhị phân và “lượt đặt chỗ đầu tiên” cho hành vi cần dự đoán. Tên cột và mã giá trị được giữ nguyên để đối chiếu với dữ liệu.
+
+**Các thuật ngữ dùng trong báo cáo**
+
+| Thuật ngữ | Giải nghĩa |
+| --- | --- |
+| EDA | Phân tích khám phá dữ liệu bằng bảng, biểu đồ và thống kê mô tả. |
+| NDF | Mã No Destination Found trong country_destination, nghĩa là bộ dữ liệu không ghi nhận lượt đặt chỗ. Mã này không có nghĩa người dùng sẽ không bao giờ đặt chỗ. |
+| Nhãn y | Mục tiêu nhị phân: y=1 nếu country_destination khác NDF, y=0 nếu bằng NDF. Cột country_destination giữ nguyên 12 giá trị điểm đến gốc. |
+| Lượt đặt chỗ đầu tiên | Lượt đặt chỗ đầu tiên được ghi nhận trong bộ dữ liệu (first booking). |
+| t0 | Thời điểm dự đoán, được chọn là ngay sau khi người dùng hoàn tất tạo tài khoản. |
+| Thời hạn dự đoán (horizon) | Khoảng thời gian tính từ t0 để xét hành vi, chẳng hạn 90 ngày. Thời gian theo dõi thực tế của nhãn y hiện có còn cần xác minh. |
+| Nhóm đăng ký (cohort) | Những người tạo tài khoản trong cùng một khoảng thời gian, thường là một tháng hoặc một năm. |
+| Rò rỉ thông tin (leakage) | Việc dùng thông tin tiết lộ kết quả hoặc chưa có sẵn tại t0 làm đầu vào dự đoán. |
+| Cramér V | Thước đo độ mạnh liên hệ giữa hai biến phân loại, từ 0 (không liên hệ) đến 1 (liên hệ hoàn toàn). |
+| Rank-biserial | Thước đo chênh lệch thứ hạng giữa hai nhóm, từ −1 đến 1. Với tuổi, dấu dương nghĩa nhóm y=1 có xu hướng lớn tuổi hơn. Giá trị gần 0 nghĩa khác biệt rất nhỏ. |
+| Khoảng Wilson 95% | Khoảng tin cậy cho tỷ lệ trong một nhóm. Khoảng rộng cho biết ước lượng còn kém chính xác, thường do nhóm ít người. |
+| Sessions | Nhật ký hoạt động trên web hoặc ứng dụng. Mỗi người dùng có thể có nhiều sự kiện. |
+| Train / test | Tập có nhãn dùng cho nghiên cứu / tập Kaggle không có nhãn, dùng đối chiếu cấu trúc và phân phối. |
+| NA / unknown / untracked | Giá trị bị thiếu / mã không rõ thông tin / mã không theo dõi được. Báo cáo giữ riêng ba trường hợp. |
+| Mốc bắt đầu dự đoán (origin) | Thời điểm lịch bắt đầu một lượt đánh giá. Dữ liệu dùng huấn luyện phải có sẵn trước mốc này. |
+
 ## Tóm tắt điều hành
 
-1. **Bài toán đã chọn:** xác suất user mới có booking đầu được ghi nhận, t0 thiết kế ngay sau tạo account; 213,451 user train và 62,096 test. Horizon nguồn chưa được xác nhận; xem phần 1.
+**Kết luận:** Airbnb phù hợp nhất trong ba bộ dữ liệu để nghiên cứu xác suất người dùng mới có lượt đặt chỗ đầu tiên. Báo cáo chọn thời điểm dự đoán ngay sau khi tạo tài khoản và đề xuất bắt đầu thí nghiệm mô hình sau khi hoàn tất ba việc dưới đây.
 
-2. **Nhãn và độ trễ:** 88,908 user có booking (41.65%); trong 88,879 độ trễ không âm, 30/60/90 ngày bao phủ 75.33%/80.26%/83.29%. Xem bảng độ trễ phần 5.
+**Năm phát hiện chính**
 
-3. **Ngoại lệ nhãn:** 29 booking trước ngày account; max độ trễ ở mọi năm là 365 ngày. Đây là căn cứ điều tra cơ chế nhãn, chưa chứng minh NDF đã được theo dõi đủ một năm.
+1. **Quy mô và nhãn y:** tập train có 213,451 người dùng, trong đó 88,908 người có lượt đặt chỗ đầu tiên (41.65%). Tập test có 62,096 người dùng. Hai nhóm nhãn y có quy mô đủ lớn để bắt đầu thí nghiệm với phân phối lớp hiện có.
 
-4. **Leakage đã chứng minh:** presence date_first_booking khớp 100% nhãn; giữ bảng chéo tại phần 3. Cột này và cờ thiếu không là đầu vào dự đoán.
+2. **Thời gian phát sinh đặt chỗ:** trong 88,879 lượt đặt chỗ có độ trễ không âm, 75.33% xảy ra trong 30 ngày, 80.26% trong 60 ngày và 83.29% trong 90 ngày. Vì phần lớn lượt đặt chỗ tập trung trong ba tháng đầu, 90 ngày là thời hạn đáng xem xét cho phương án triển khai.
 
-5. **Liên hệ có định lượng:** gender có V=0.207 toàn kỳ và 0.251 trong 2014; signup_app tương ứng 0.109/0.156. Bảng đủ biến và phân tầng ở phần 5, chưa là chất lượng mô hình.
+3. **Liên hệ của hồ sơ đăng ký:** gender có V=0.207 trên toàn kỳ và 0.251 trong năm 2014, được diễn giải ở mức yếu đến vừa trong báo cáo. signup_app có liên hệ yếu hơn, với V lần lượt là 0.109 và 0.156. Hai biến này là ứng viên để kiểm tra giá trị bổ sung trong mô hình.
 
-6. **So sessions cùng điều kiện:** train 2014 96.53% so với test 2014 99.31%, chênh 2.78 điểm phần trăm. 76,466 user train nằm trong phạm vi cohort có log; xem phần sessions.
+4. **Độ đầy đủ của hồ sơ tuổi:** age thiếu ở 41.22% người dùng. Trong năm 2014, cờ thiếu tuổi có V=0.374, còn tuổi trong dải 16–100 có rank-biserial=-0.005, gần 0. Mức độ đầy đủ của hồ sơ có liên hệ đáng chú ý với nhãn y, trong khi khác biệt thứ hạng tuổi giữa hai nhóm rất nhỏ.
 
-7. **Có log không đồng nghĩa nhãn giống nhau:** trong 2014, booking rate có log 38.98%, không log 17.54%. Cần đọc cùng n/Wilson; không dùng presence log làm tín hiệu tại signup khi chưa chứng minh t0.
+5. **Phạm vi nhật ký hoạt động:** trong năm 2014, 96.53% người dùng train và 99.31% người dùng test có sessions, chênh 2.78 điểm phần trăm. Tỷ lệ có đặt chỗ trong nhóm có nhật ký là 38.98%, so với 17.54% ở nhóm thiếu nhật ký. Vì dữ liệu trước năm 2014 không có sessions, nghiên cứu riêng nguồn này cần tập trung vào 76,466 người dùng train đăng ký năm 2014.
 
-8. **Missing và tuổi:** age thiếu 41.22%; trong 2014, cờ thiếu tuổi có V=0.374, còn rank-biserial của tuổi 16–100 là -0.005. Hai thước đo khác nhau; kết quả nhấn mạnh cần kiểm tra tính đầy đủ hồ sơ và snapshot tại t0. Giữ riêng NA, unknown và untracked.
+**Ba việc cần giải quyết trước khi huấn luyện**
 
-9. **Thiết kế tiếp theo đã cụ thể hóa:** baseline hằng/Logistic L2, CatBoost và calibration; rolling theo signup, calibration tháng 4/2014, đánh giá cuối tháng 5–6/2014. Đây là protocol đề xuất, chưa chia tập hay train.
+1. **Xác minh nhãn và thời gian theo dõi.** Làm rõ 29 trường hợp có ngày đặt chỗ trước ngày tạo tài khoản và lý do độ trễ lớn nhất quan sát được là 365 ngày. Bổ sung ngày kết thúc theo dõi của từng người dùng để có thể xây dựng nhãn âm cho thời hạn 90 ngày.
+
+2. **Chốt thông tin có sẵn tại t0.** Xác nhận hồ sơ phản ánh thời điểm đăng ký. Loại date_first_booking và cờ thiếu của cột này khỏi đầu vào vì chúng khớp nhãn y ở 100% trường hợp. Thiết kế chính cũng loại sessions vì nhật ký thiếu thời điểm sự kiện để xác định phần có trước t0.
+
+3. **Chốt thí nghiệm và tiêu chí đánh giá.** So sánh xác suất hằng, Logistic Regression có điều chuẩn L2 và CatBoost bằng các lượt chia theo thời gian. Dành tháng 4/2014 để hiệu chỉnh xác suất và tháng 5–6/2014 để đánh giá cuối. Trước khi huấn luyện, xác nhận nhãn dùng học đã có sẵn tại mốc bắt đầu dự đoán của mỗi lượt chia.
 
 ## 1. Bài toán và lý do chọn dữ liệu
 
-**Bối cảnh nghiệp vụ:** ưu tiên hỗ trợ onboarding/cá nhân hóa cho người dùng mới dựa trên khả năng phát sinh booking đầu. Điểm propensity mô tả xu hướng hành vi; chưa phải tác động tăng thêm do một chiến dịch.
+**Bối cảnh nghiệp vụ:** doanh nghiệp muốn ưu tiên hỗ trợ và cá nhân hóa trải nghiệm cho người dùng mới dựa trên khả năng họ phát sinh lượt đặt chỗ đầu tiên. Mỗi người dùng nhận một điểm xác suất để phục vụ việc sắp thứ tự ưu tiên.
 
-**Phát biểu bài toán nghiên cứu đã chọn:** với một user mới, sử dụng thông tin đăng ký sẵn có tại t0 để ước lượng xác suất có booking đầu được ghi nhận trong nhãn nguồn. Đầu ra là một xác suất [0,1] cho mỗi user, phục vụ sắp ưu tiên; bài toán điểm đến 12 lớp được giữ làm bối cảnh EDA.
+**Bài toán nghiên cứu:** ngay sau khi người dùng tạo tài khoản, mô hình dự kiến sử dụng thông tin đăng ký để ước lượng xác suất có lượt đặt chỗ đầu tiên được ghi nhận trong bộ dữ liệu. Đầu ra là xác suất trong [0,1] cho từng người dùng. Bài toán dự đoán điểm đến với 12 lớp được trình bày để giải thích nguồn dữ liệu.
 
-**t0 thiết kế:** ngay sau khi hoàn tất tạo tài khoản. date_account_created chỉ chính xác tới ngày nên không xác minh được thứ tự trong ngày. Nhãn nghiên cứu y=1 khi country_destination khác NDF; y=0 khi NDF, không diễn giải thành “không bao giờ book”. Các giá trị hồ sơ phải được xác minh là snapshot tại signup. 29 booking có ngày trước account chưa thỏa logic first-booking tương lai tại t0; đề xuất cách ly để xác minh ở giai đoạn sau, chưa xóa.
+**Thời điểm dự đoán t0:** báo cáo chọn thời điểm ngay sau khi hoàn tất tạo tài khoản. Vì date_account_created chỉ ghi ngày, dữ liệu hiện tại chỉ cho phép kiểm tra thứ tự giữa các ngày. Để dùng thông tin hồ sơ tại t0, cần xác minh mỗi giá trị phản ánh hồ sơ lúc đăng ký.
 
-**Horizon:** phạm vi hiện tại là kết quả được ghi nhận theo cơ chế nhãn nguồn, không tự đổi thành nhãn 90 ngày. Horizon nghiệp vụ đề xuất là 90 ngày vì bao phủ 83.29% booking quan sát hợp lệ; muốn triển khai cần xác nhận ngày kết thúc theo dõi và nhãn âm. Nếu không xác minh được, chỉ được kết luận về bài toán nghiên cứu theo nhãn nguồn.
+**Nhãn y:** y=1 khi country_destination khác NDF và y=0 khi country_destination bằng NDF. Nhãn y thể hiện kết quả được ghi nhận trong bộ dữ liệu. Có 29 trường hợp ngày đặt chỗ trước ngày tạo tài khoản. Các trường hợp này cần được đánh dấu để xác minh trước khi quyết định đưa vào tập huấn luyện.
+
+**Thời hạn dự đoán:** bài toán hiện tại dùng nhãn y với thời gian theo dõi theo bộ dữ liệu. Phương án triển khai đề xuất thời hạn 90 ngày vì khoảng này bao phủ 83.29% lượt đặt chỗ có độ trễ hợp lệ. Để xây dựng nhãn cho phương án đó, cần biết ngày kết thúc theo dõi của từng người dùng. Người không đặt chỗ chỉ được gán nhãn âm 90 ngày khi đã được theo dõi đủ khoảng thời gian này.
 
 **Lý do chọn Airbnb so với hai bộ còn lại**
 
 | dataset | unit | evidence | fit | decision |
 | --- | --- | --- | --- | --- |
 | AIRBNB | User mới | 213,451 user; 41.65% có booking | Đúng đối tượng chấm propensity khách hàng; có ID | Chọn cho nghiên cứu, còn điều kiện nhãn/t0 |
-| HOTEL | Booking đã được tạo | Nhãn hủy/no-show; không quan sát đầy đủ người chưa đặt | Hợp cancellation propensity | Không trả lời trực tiếp ai sẽ tạo booking đầu |
+| HOTEL | Booking đã được tạo | Nhãn hủy/no-show; không quan sát đầy đủ người chưa đặt | Hợp cancellation propensity | Không trả lời trực tiếp ai sẽ tạo lượt đặt chỗ đầu tiên |
 | EXPEDIA | Cặp search–hotel | Tương tác trong danh sách; thiếu user ID và search không click | Hợp ranking/propensity trong search | Không ưu tiên cho propensity onboarding theo user |
 
 ## 2. Tổng quan bộ dữ liệu
@@ -54,8 +86,8 @@ Nguồn công bố: [trang dữ liệu/nghiên cứu gốc](https://www.kaggle.c
 | --- | --- |
 | Tên / nơi công bố | Airbnb / Kaggle — Airbnb New User Bookings |
 | Năm công bố | Cuộc thi công bố 2015, kết thúc 2016 |
-| Mục đích thu thập/công bố | Dự đoán quốc gia của booking đầu cho người dùng mới, phục vụ cá nhân hóa nội dung. |
-| Cách thu thập / quần thể | Hồ sơ đăng ký, web/app logs và các bảng tổng hợp; người dùng trong tập từ Mỹ. Quy trình chọn người dùng chi tiết và ngày đóng nhãn chưa được lưu trong CSV. |
+| Mục đích thu thập/công bố | Dự đoán quốc gia của lượt đặt chỗ đầu tiên cho người dùng mới để cá nhân hóa nội dung. |
+| Cách thu thập / quần thể | Dữ liệu gồm hồ sơ đăng ký, nhật ký web/ứng dụng và các bảng tổng hợp của người dùng từ Mỹ. CSV chưa lưu chi tiết cách chọn người dùng và ngày kết thúc theo dõi của từng người. |
 | Thời gian bao phủ quan sát được | Account train 2010-01-01–2014-06-30; test 2014-07-01–2014-09-30 |
 | Ngày tải raw | Không được lưu; người cung cấp xác nhận 2026-11-02. Mã phiên bản Kaggle chưa có bằng chứng; dùng snapshot SHA-256. |
 | Quy mô bảng train/chính | 213,451 dòng × 16 cột thô |
@@ -65,9 +97,9 @@ Nguồn công bố: [trang dữ liệu/nghiên cứu gốc](https://www.kaggle.c
 
 ### Bối cảnh, đơn vị quan sát và phạm vi nhãn
 
-Train gồm **213,451 người dùng, 16 cột**, test gồm **62,096 người dùng, 15 cột**. Nhãn gốc là `country_destination` với 12 giá trị, gồm `NDF` và 11 điểm đến/nhóm điểm đến còn lại. Đối với propensity nhị phân, báo cáo chỉ thống kê hành vi **có booking được ghi nhận** khi nhãn khác NDF; không tạo tập nhãn huấn luyện mới.
+Train gồm **213,451 người dùng, 16 cột**, test gồm **62,096 người dùng, 15 cột**. Cột `country_destination` có 12 giá trị, gồm `NDF` và 11 điểm đến hoặc nhóm điểm đến. Báo cáo định nghĩa nhãn y từ cột này để phân tích khả năng có lượt đặt chỗ đầu tiên ở cấp người dùng.
 
-Mục tiêu gốc là dự đoán điểm đến booking đầu, không trực tiếp cung cấp nhãn booking trong 30/60/90 ngày. `NDF` nghĩa không có booking theo nhãn của bộ dữ liệu; không khẳng định người dùng sẽ không bao giờ book. Phân tích độ trễ và độ nhạy horizon ở phần 5 phân biệt nhãn nguồn với nhãn triển khai theo thời hạn.
+Mục tiêu gốc của bộ dữ liệu là dự đoán điểm đến của lượt đặt chỗ đầu tiên. Nhãn y kế thừa phạm vi theo dõi của bộ dữ liệu. Phần 5 phân tích độ trễ và thông tin cần bổ sung để xây dựng nhãn cho thời hạn 30, 60 hoặc 90 ngày.
 
 [Mô tả cuộc thi Airbnb New User Bookings](https://www.kaggle.com/c/airbnb-recruiting-new-user-bookings/data) nêu người dùng trong tập đến từ Mỹ. Vì vậy tính đại diện về địa lý, thời kỳ và sản phẩm có giới hạn. Test công khai không có nhãn để tính chất lượng dự đoán hoặc so sánh booking rate với train.
 
@@ -75,11 +107,11 @@ Mục tiêu gốc là dự đoán điểm đến booking đầu, không trực t
 
 ### Chất lượng users, sentinel và rò rỉ nhãn
 
-**Rò rỉ đã kiểm chứng:** presence của `date_first_booking` khớp nhãn có booking ở **100.00%** người dùng train. Không dùng ngày này, hoặc cờ thiếu ngày này, làm đầu vào dự đoán booking đầu. Đây là thiếu theo cấu trúc kết quả, không phải missing cần impute.
+**Rò rỉ đã kiểm chứng:** việc `date_first_booking` có giá trị hay bị thiếu khớp nhãn y ở **100.00%** người dùng train. Vì cột này tiết lộ kết quả cần dự đoán, thiết kế đầu vào loại cả ngày đặt chỗ và cờ thiếu ngày đặt chỗ. Giá trị thiếu ở đây phản ánh cách ghi nhận kết quả nên không cần điền ngày thay thế.
 
-Tuổi ngoài [16,100] được gắn cờ cho EDA; đây là **dải tham chiếu**, không phải chính sách hợp lệ đã xác nhận. Giá trị dạng 19xx/20xx có thể là năm sinh nhưng CSV không chứng minh nguyên nhân của từng dòng; không đổi tuổi, xóa người dùng hay thay giá trị. Gender/browser có sentinel cần thống kê riêng với NA.
+Tuổi ngoài [16,100] được thống kê riêng theo một **dải tham chiếu dùng cho EDA**. Các giá trị dạng 19xx/20xx gợi ý khả năng người dùng đã nhập năm sinh. Cần xác minh cách thu thập trước khi quyết định chuyển đổi hoặc thay thế tuổi. Các mã đặc biệt trong gender và browser được thống kê riêng với giá trị thiếu NA.
 
-Ngày hoạt động đầu trước ngày tạo tài khoản được nguồn gốc cho phép vì có thể tìm kiếm trước khi đăng ký. Có **29** dòng ngày booking trước ngày account; đây là câu hỏi về định nghĩa mốc thời gian cần xác minh, không tự động kết luận lỗi rồi loại bỏ.
+Người dùng có thể tìm kiếm trước khi đăng ký, nên ngày hoạt động đầu có thể sớm hơn ngày tạo tài khoản. Có **29** dòng ghi ngày đặt chỗ trước ngày tạo tài khoản. Những trường hợp này cần được đối chiếu với định nghĩa các mốc thời gian trước khi quyết định đưa vào tập huấn luyện.
 
 **Kiểm tra định danh và logic thời gian**
 
@@ -91,7 +123,7 @@ Ngày hoạt động đầu trước ngày tạo tài khoản được nguồn g
 | date_first_booking.notna không khớp nhãn có booking | 0 |
 | date_first_booking có giá trị trong test | 0 |
 | Tuổi có giá trị nhưng ngoài [16,100] (quy ước mô tả) | 2,410 |
-| Booking đầu trước ngày tạo tài khoản | 29 |
+| Lượt đặt chỗ đầu tiên trước ngày tạo tài khoản | 29 |
 | Hoạt động đầu trước ngày tạo tài khoản | 178 |
 | Ngày account không parse được | 0 |
 | Timestamp hoạt động đầu không parse được | 0 |
@@ -177,13 +209,13 @@ Nhận xét: signup_app có 4 nhóm (không có NA); 0 nhóm dưới 100 quan s�
 
 ### Độ trễ booking và giới hạn định nghĩa nhãn
 
-Độ trễ = date_first_booking − date_account_created, tính bằng ngày lịch; ngày booking chỉ dùng để kiểm tra nhãn. Có 88,879 độ trễ không âm và 29 độ trễ âm. Không diễn giải độ trễ âm là booking tương lai và không sửa chúng trong EDA.
+Độ trễ là số ngày lịch từ ngày tạo tài khoản đến ngày đặt chỗ đầu tiên, tính bằng date_first_booking − date_account_created. Có 88,879 lượt đặt chỗ có độ trễ không âm. Báo cáo thống kê riêng 29 trường hợp có ngày đặt chỗ trước ngày tạo tài khoản để kiểm tra lại định nghĩa thời gian.
 
-**Cửa sổ 90 ngày bao phủ 83.29% booking quan sát có độ trễ hợp lệ**, còn khoảng 16.71% nằm sau 90 ngày. Các tỷ lệ dưới đây không phải xác suất booking 30/60/90 ngày của toàn bộ user.
+**Trong các lượt đặt chỗ có độ trễ hợp lệ, 83.29% xảy ra trong 90 ngày đầu** và 16.71% xảy ra muộn hơn. Vì mẫu số chỉ gồm người đã đặt chỗ, các tỷ lệ này mô tả tốc độ phát sinh đặt chỗ trong nhóm đó. Xác suất đặt chỗ của toàn bộ người dùng cần một mẫu số khác, gồm cả người mang nhãn y=0.
 
-Ngày booking lớn nhất là 2015-06-29. Độ trễ lớn nhất ở cả năm cohort là 365 ngày. Điều này phù hợp với giả thuyết nhãn có giới hạn khoảng một năm theo từng user, nhưng chưa chứng minh cơ chế đóng nhãn hoặc thời gian theo dõi của NDF. **Không thể kết luận NDF ở cohort mới chỉ là chưa kịp booking, cũng chưa thể bác bỏ khả năng đó.**
+Ngày đặt chỗ muộn nhất là 2015-06-29. Độ trễ lớn nhất trong mỗi nhóm năm tạo tài khoản đều là 365 ngày. Mẫu hình này gợi ý cần kiểm tra liệu dữ liệu có giới hạn theo dõi một năm cho từng người dùng hay không. Câu trả lời quyết định cách diễn giải nhãn y=0, nhất là ở các nhóm đăng ký gần cuối tập train.
 
-Nếu giả định mọi user đều được theo dõi tới ngày booking lớn nhất, toàn bộ train có khoảng cách lịch đủ 30/60/90 ngày. Đây là phân tích độ nhạy theo một giả định chưa kiểm chứng, không phải bằng chứng xác nhận NDF đã trưởng thành. Bài toán chính dùng nhãn nguồn; 90 ngày là horizon triển khai cần dữ liệu bổ sung để xác nhận nhãn âm.
+Để xem kết quả phụ thuộc vào thời gian theo dõi như thế nào, báo cáo thử giả định mọi người dùng đều được theo dõi đến ngày đặt chỗ muộn nhất. Theo giả định này, toàn bộ train có khoảng cách lịch đủ 30, 60 và 90 ngày. Ngày kết thúc theo dõi thực tế vẫn cần được bổ sung để xác nhận ai đã được theo dõi đủ 90 ngày mà không đặt chỗ. Trong phạm vi hiện tại, bài toán dùng nhãn y được định nghĩa từ cột country_destination.
 
 **Phân phối độ trễ: mẫu số và ngoại lệ**
 
@@ -191,7 +223,7 @@ Nếu giả định mọi user đều được theo dõi tới ngày booking l�
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 88,908 | 88,879 | 29 | 0 | 3 | 29 | 189 | 278 | 365 |
 
-**Mức bao phủ các horizon trên booking đã quan sát**
+**Mức bao phủ các thời hạn trên lượt đặt chỗ đã ghi nhận**
 
 | horizon_days | bookings_within_h | denominator_valid_bookings | pct_valid_bookings | pct_all_observed_bookings |
 | --- | --- | --- | --- | --- |
@@ -212,7 +244,7 @@ Nếu giả định mọi user đều được theo dõi tới ngày booking l�
 | 2013 | 82,960 | 33,883 | 1 | 74.4503 | 79.2492 | 82.3156 | 365 | 2014-12-30 |
 | 2014 | 76,466 | 29,239 | 0 | 73.8568 | 79.2845 | 82.6738 | 365 | 2015-06-29 |
 
-**Giả định chung ngày đóng nhãn: chỉ là độ nhạy**
+**Phân tích độ nhạy khi giả định cùng ngày kết thúc theo dõi**
 
 | assumed_common_cutoff | horizon_days | users_with_calendar_gap_ge_h | pct_users | status |
 | --- | --- | --- | --- | --- |
@@ -223,17 +255,21 @@ Nếu giả định mọi user đều được theo dõi tới ngày booking l�
 
 ![booking delay](figures/booking_delay.png)
 
-Nhận xét: trong 88,879 booking có độ trễ không âm, 75.33% xảy ra trong 30 ngày, 80.26% trong 60 ngày và 83.29% trong 90 ngày. Đây là phân phối có điều kiện trên người đã book; chưa xác định thời gian theo dõi của NDF. 29 độ trễ âm được báo riêng, không xóa khỏi raw.
+Nhận xét: trong 88,879 lượt đặt chỗ có độ trễ không âm, 75.33% xảy ra trong 30 ngày, 80.26% trong 60 ngày và 83.29% trong 90 ngày. Phần tăng thêm từ ngày 30 đến ngày 90 cho thấy lợi ích về mức bao phủ khi kéo dài thời hạn. Mẫu số chỉ gồm các lượt đặt chỗ có độ trễ hợp lệ. Bảng ngoại lệ thống kê riêng 29 trường hợp độ trễ âm.
 
-### Độ mạnh liên hệ với nhãn trên toàn bộ biến ứng viên
+### Độ mạnh liên hệ với nhãn y trên toàn bộ biến ứng viên
 
-Phạm vi sàng lọc gồm 13 cột ứng viên gốc: 10 biến phân loại, age và hai mốc thời gian. Cờ thiếu tuổi là một góc nhìn EDA bổ sung, không được xuất thành feature. Ngày tạo account/hoạt động đầu được nhóm theo tháng chỉ để mô tả cohort. ID, nhãn và date_first_booking không được dùng để chứng minh tín hiệu đầu vào.
+Phân tích xem xét 13 cột ứng viên gốc, gồm 10 biến phân loại, age và hai mốc thời gian. Cờ thiếu tuổi bổ sung góc nhìn về mức độ đầy đủ của hồ sơ. Hai mốc thời gian được nhóm theo tháng để mô tả nhóm đăng ký. ID, country_destination và date_first_booking được loại khỏi danh sách biến ứng viên.
 
-Cramér V = sqrt(chi-square / [n × min(r−1,c−1)]), trong [0,1]; càng lớn là liên hệ biên càng mạnh. Cột effect_2014 tính lại trên cohort 2014 để kiểm tra ảnh hưởng thành phần năm. Không áp một ngưỡng V chung để tuyên bố biến hữu ích cho mô hình. P-value nhỏ khi n lớn chưa đảm bảo hiệu ứng có giá trị; các category hiếm làm kiểm định chi-square xấp xỉ kém hơn.
+Cramér V = sqrt(chi-square / [n × min(r−1,c−1)]), với r và c là số hàng và cột của bảng chéo. V nằm trong [0,1] và tăng khi liên hệ giữa hai biến mạnh hơn. Cột effect_all mô tả toàn bộ train. Cột effect_2014 tính riêng cho người tạo tài khoản năm 2014 để đối chiếu ảnh hưởng của thành phần năm.
 
-Tuổi được kiểm định Mann–Whitney hai phía trong cửa sổ tham chiếu 16–100, kèm rank-biserial trong [−1,1]. Dấu dương nghĩa tuổi ở nhóm booked có xu hướng cao hơn NDF; trị tuyệt đối gần 0 là khác biệt nhỏ. Không so trực tiếp trị số rank-biserial với V như cùng một thang đo. Tuổi ngoài dải và NA vẫn được báo riêng.
+**Cách đọc kết quả:** gender có V=0.207 trên toàn kỳ và 0.251 trong năm 2014. Báo cáo diễn giải mức khoảng 0,2 này là liên hệ yếu đến vừa. signup_app có V=0.109 và 0.156, thể hiện liên hệ yếu hơn gender trong cả hai phạm vi. Đây là cách diễn giải mô tả trên thang 0–1, không phải ngưỡng chung để chọn biến. Các kết quả cho thấy nên kiểm tra giá trị bổ sung của hai biến khi huấn luyện.
 
-Đây là bằng chứng **liên hệ thống kê trong mẫu**, thay cho việc bịa ra AUC ở giai đoạn chưa train; chưa chứng minh khả năng dự báo ngoài thời gian hoặc tác động nhân quả. Nguồn phương pháp: [Cramér V của SciPy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.contingency.association.html), [Mann–Whitney của SciPy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.mannwhitneyu.html).
+Tuổi trong dải tham chiếu 16–100 được so sánh giữa hai nhóm nhãn y bằng kiểm định Mann–Whitney hai phía. Hệ số rank-biserial đi kèm nằm trong [−1,1]. Dấu dương cho biết tuổi ở nhóm y=1 có xu hướng cao hơn nhóm y=0. Trị tuyệt đối gần 0 cho biết khác biệt về thứ hạng tuổi rất nhỏ. Vì rank-biserial và Cramér V đo hai dạng liên hệ khác nhau, chúng cần được diễn giải riêng. Tuổi ngoài dải và tuổi thiếu có thống kê riêng.
+
+Bảng giữ p-value và giá trị q sau điều chỉnh nhiều phép kiểm định để người đọc kiểm tra phương pháp. Với cỡ mẫu lớn, cần đọc chúng cùng độ mạnh liên hệ. Tỷ lệ ô có tần số kỳ vọng dưới 5 giúp nhận biết những kiểm định chi-square có xấp xỉ kém tin cậy hơn.
+
+Báo cáo này không đưa AUC vì chưa huấn luyện mô hình. Nguồn phương pháp: [Cramér V của SciPy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.contingency.association.html), [Mann–Whitney của SciPy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.mannwhitneyu.html).
 
 **Độ mạnh liên hệ toàn kỳ và trong cohort 2014; nêu đủ 14 phép sàng lọc**
 
@@ -254,9 +290,9 @@ Tuổi được kiểm định Mann–Whitney hai phía trong cửa sổ tham ch
 | timestamp_first_active: tháng (EDA) | Cramér V | 0.1096 | 0.024 | 213,451 | 76,466 | 59 | 8.4746 | <1e-300 | <1e-300 |
 | age: chỉ cửa sổ 16–100 (EDA) | Rank-biserial | -0.0324 | -0.0049 | 123,051 | 41,605 | — | — | 9.53e-23 | 9.53e-23 |
 
-### Tỷ lệ booking theo hồ sơ, kênh, thiết bị và missing tuổi
+### Tỷ lệ đặt chỗ theo hồ sơ, kênh, thiết bị và tình trạng thiếu tuổi
 
-Mỗi mẫu số là user trong nhóm. Bảng có n, số booking, tỷ lệ và Wilson 95%; n<100 là cờ thận trọng. Giữ riêng NA, giá trị unknown và tuổi ngoài dải. Các chênh lệch ở đây là liên hệ biên, được đối chiếu với phân tầng năm ở phần tiếp theo.
+Mỗi tỷ lệ được tính trên số người dùng trong nhóm. Cột n là số người dùng, positive là số người có nhãn y=1, rate_pct là tỷ lệ phần trăm. Hai cột ci95_low_pct và ci95_high_pct là cận dưới và cận trên của khoảng Wilson 95%. Nhóm có n<100 được đánh dấu vì ước lượng có thể kém chính xác. Các bảng giữ riêng NA, unknown và tuổi ngoài dải tham chiếu. Phần tiếp theo so sánh các nhóm trong từng năm đăng ký để xem chênh lệch thay đổi như thế nào.
 
 **Booking theo gender — toàn bộ nhóm**
 
@@ -348,9 +384,9 @@ Mỗi mẫu số là user trong nhóm. Bảng có n, số booking, tỷ lệ và
 
 ### Tách thành phần cohort khỏi chênh lệch app, gender và kênh
 
-Đọc theo từng cột năm để so sánh các nhóm trong cùng cohort. Một số ứng dụng không xuất hiện ở năm đầu nên không thể chuẩn hóa ngây thơ mọi nhóm theo cùng cơ cấu 2010–2014. Bảng tỷ lệ toàn kỳ không được dùng để kết luận app/kênh/giới tính gây tăng booking.
+Mỗi cột trong bảng tương ứng với một năm tạo tài khoản. Đọc theo cột giúp so sánh ứng dụng, giới tính hoặc kênh tiếp cận trong cùng nhóm đăng ký. Một số ứng dụng chỉ xuất hiện ở các năm sau, nên so sánh toàn kỳ có thể chịu ảnh hưởng của thành phần năm.
 
-Ngay cả khi chênh lệch còn trong một năm, đó vẫn là liên hệ sau phân tầng năm, chưa phải ước lượng nhân quả hoặc đã kiểm soát mọi nhiễu. Bảng dài với Wilson 95% nằm ở phụ lục để kiểm tra các ô n nhỏ.
+Việc tách theo năm giúp kiểm tra một phần ảnh hưởng này. Khác biệt theo tháng hoặc các đặc điểm khác vẫn cần được xem xét khi xây dựng mô hình. Phụ lục cung cấp khoảng Wilson 95% cho từng ô để đọc cùng số người dùng.
 
 **signup_app × năm signup: tỷ lệ và n**
 
@@ -385,29 +421,29 @@ Ngay cả khi chênh lệch còn trong một năm, đó vẫn là liên hệ sau
 
 ![cohort strata](figures/cohort_strata.png)
 
-Nhận xét: riêng năm 2014, Web có booking rate 42.53% so với iOS 25.23% và Android 21.85%; chênh lệch app vẫn hiện diện trong cùng năm. FEMALE đạt 50.84% so với gender unknown 26.54%. Nhóm OTHER chỉ có 72 user 2014 nên cần đọc Wilson ở phụ lục. Dấu * là n<100. Phân tầng năm chưa kiểm soát nhiễu theo tháng hoặc biến khác.
+Nhận xét: trong năm 2014, tỷ lệ đặt chỗ của Web là 42.53%, iOS là 25.23% và Android là 21.85%. Chênh lệch giữa các ứng dụng vẫn xuất hiện khi so sánh trong cùng năm. Nhóm FEMALE có tỷ lệ 50.84%, so với 26.54% ở nhóm giới tính unknown. Nhóm OTHER chỉ có 72 người nên cần đọc cùng khoảng Wilson trong phụ lục. Dấu * đánh dấu ô có n<100.
 
-### Tương tác liên quan đến nhãn trong cohort 2014
+### Tỷ lệ đặt chỗ theo các nhóm kết hợp trong năm 2014
 
-Thay biểu đồ hai trục ngày gần trùng nhau bằng signup_app × affiliate_channel và missing tuổi × gender. Nhóm tuổi/cờ thiếu chỉ tồn tại để tính bảng và hình EDA; chưa xuất dữ liệu đầu vào. Không kiểm định tương tác hàng loạt hoặc tự chọn feature từ hình.
+Hai biểu đồ kết hợp ứng dụng đăng ký với kênh tiếp cận, và tình trạng thiếu tuổi với giới tính khai báo. Cách nhìn này giúp xác định những nhóm cần kiểm tra thêm trong mô hình. Màu biểu diễn tỷ lệ đặt chỗ, còn n cho biết số người dùng trong ô. Dấu * đánh dấu ô có dưới 100 người. Các nhóm và cờ thiếu được tính tạm để lập bảng EDA.
 
 ![multivariate](figures/multivariate.png)
 
-Nhận xét: trong user Web năm 2014, nhóm direct có booking rate 45.18% (n=33,354), nhóm content 11.08% (n=1,642). Trong nhóm FEMALE cùng năm, có tuổi đạt 51.74% so với thiếu tuổi 32.41%. Dấu * là n<100. Liên hệ không chỉ do trộn các năm, nhưng vẫn chưa chứng minh quan hệ nhân quả hoặc mô hình phi tuyến sẽ thắng baseline.
+Nhận xét: với người dùng Web năm 2014, nhóm direct có tỷ lệ đặt chỗ 45.18% (n=33,354). Nhóm content có tỷ lệ 11.08% (n=1,642). Trong nhóm FEMALE cùng năm, tỷ lệ của người có tuổi là 51.74%, so với 32.41% ở người thiếu tuổi. Các chênh lệch trong cùng năm là cơ sở để kiểm tra giá trị của những nhóm kết hợp khi huấn luyện. Dấu * đánh dấu ô có n<100.
 
 ### Sessions: so sánh cùng cohort và rà soát thông tin giao dịch
 
-Đã quét toàn bộ 10,567,737 sự kiện. So sánh phù hợp hơn là **train cohort 2014: 73,815/76,466 (96.53%)** với **test cohort 2014: 99.31%**; chênh 2.78 điểm phần trăm. Tỷ lệ train toàn kỳ 34,58% chủ yếu phản ánh việc cohort 2010–2013 không có log, không phải bằng chứng user ít hoạt động.
+Phân tích đã quét toàn bộ 10,567,737 sự kiện. Trong nhóm đăng ký năm 2014, **73,815/76,466 người dùng train có sessions (96.53%)**. Tỷ lệ tương ứng ở test là **99.31%**, cao hơn 2.78 điểm phần trăm. Tỷ lệ trên toàn bộ train chỉ là 34,58% vì nhóm đăng ký năm 2010–2013 không có nhật ký trong dữ liệu hiện có. Vì vậy, cần so sánh độ phủ trong cùng năm đăng ký.
 
-**Về độ phủ, nghiên cứu sessions phải giới hạn cohort 2014 (76,466 user train), trong đó 73,815 có log.** Về thời điểm dự đoán, sessions vẫn chưa đủ điều kiện: không có timestamp nên không cắt được trước t0. Giới hạn cohort không tự loại được rò rỉ thời gian.
+Nghiên cứu riêng sessions có phạm vi phù hợp là 76,466 người dùng train đăng ký năm 2014. Tuy nhiên, thiết kế dự đoán tại t0 cần biết sự kiện nào đã xảy ra trước thời điểm đó. Vì sessions thiếu thời điểm sự kiện, thiết kế chính loại nguồn này khỏi đầu vào cho đến khi xác minh được khoảng thời gian ghi nhật ký.
 
-Bảng có/không có log dưới đây chỉ xét 2014. Bảng số sự kiện giữ cả user không có log với event_n=0 để không nhầm mẫu số. Thời lượng secs_elapsed không phải timestamp và tổng thời lượng không chứng minh thứ tự hành động.
+Bảng dưới so sánh người có và không có sessions trong năm 2014. Bảng số sự kiện giữ cả người không có nhật ký và gán event_n=0 khi tính thống kê. Cột secs_elapsed là thời lượng, nên không xác định được thời điểm hoặc thứ tự hành động.
 
-Rà soát tên ứng viên giao dịch/xác minh theo regex **(?:^|_)(?:book[a-z]*|reserv[a-z]*|pay[a-z]*|checkout|receipt|itinerar[a-z]*|confirm[a-z]*|request[a-z]*|billing)(?:_|$)**, trước khi xem liên hệ với nhãn; khớp token phân cách bởi dấu gạch dưới và giữ đầy đủ action_type để đối chiếu. Nhóm confirm/request có thể liên quan xác minh tài khoản hoặc yêu cầu, chưa mặc định là booking hoàn tất. Đếm presence theo user sau khi gộp toàn bộ chunk, tránh một người bị đếm lặp vì nhiều sự kiện. Mẫu số của hai cột pct_booked/pct_ndf là người có sessions trong từng lớp, không phải toàn bộ train.
+Để rà soát rủi ro rò rỉ, phân tích chọn tên hành động liên quan giao dịch hoặc xác minh bằng biểu thức **(?:^|_)(?:book[a-z]*|reserv[a-z]*|pay[a-z]*|checkout|receipt|itinerar[a-z]*|confirm[a-z]*|request[a-z]*|billing)(?:_|$)**. Quy tắc tên được đặt trước khi xem liên hệ với nhãn y và khớp các thành phần tên phân cách bằng dấu gạch dưới. Bảng giữ đầy đủ action_type để đối chiếu. Mỗi người chỉ được đếm một lần cho mỗi tên hành động sau khi gộp toàn bộ dữ liệu.
 
-**Dấu hiệu đáng điều tra:** receipt có 101/102 user mang nhãn booked (99.02%); requested có 6,192/7,090 (87.33%). Tỷ lệ cao phù hợp với rủi ro log chứa bước sát hoặc sau kết quả, chưa chứng minh receipt luôn là hậu booking hoặc requested gây ra booking.
+**Kết quả rà soát:** trong những người có hành động receipt, 101/102 người có nhãn y=1 (99.02%). Với requested, con số tương ứng là 6,192/7,090 (87.33%). Các tỷ lệ cao cho thấy cần xác minh liệu nhật ký có chứa bước gần hoặc sau thời điểm đặt chỗ. Tên hành động có thể bao gồm yêu cầu thất bại, xác minh tài khoản hoặc chuẩn bị thanh toán, nên cần dữ liệu thời gian và mô tả nghiệp vụ để xác định ý nghĩa.
 
-Tên như booking/payment/request là dấu hiệu cần điều tra. Hành động cũng có thể là yêu cầu thất bại, chuẩn bị thanh toán hoặc hoạt động sau booking; xuất hiện ở booked hay NDF chưa chứng minh thứ tự trước/sau kết quả. **Toàn bộ sessions bị loại khỏi phạm vi đầu vào của thiết kế chính tại signup**, cho tới khi có timestamp hoặc chứng cứ về cửa sổ log. Đây là quyết định phạm vi đề xuất, chưa tạo tập feature.
+Hai cột pct_booked_users_with_action và pct_ndf_users_with_action có mẫu số là số người có sessions trong từng nhóm y=1 và y=0. Cột booking_rate_pct có mẫu số là số người có hành động đó. Các cột trả lời hai câu hỏi khác nhau: hành động phổ biến đến đâu trong mỗi nhóm nhãn, và tỷ lệ đặt chỗ của người có hành động là bao nhiêu.
 
 **Độ phủ năm account train**
 
@@ -475,13 +511,13 @@ Tên như booking/payment/request là dấu hiệu cần điều tra. Hành đ�
 
 ![session coverage](figures/session_coverage.png)
 
-Nhận xét: độ phủ train toàn kỳ 34,58% là hỗn hợp cohort; train 2014 đạt 96.53% so với test 2014 99.31%, chênh 2.78 điểm phần trăm. Không có log ở cohort 2010–2013. Độ phủ cao không chứng minh log được ghi trước thời điểm dự đoán.
+Nhận xét: độ phủ sessions trên toàn bộ train là 34,58%. Khi giới hạn ở nhóm đăng ký năm 2014, độ phủ train đạt 96.53%, gần hơn với mức 99.31% của test. Khoảng cách còn 2.78 điểm phần trăm. Nhóm đăng ký năm 2010–2013 không có nhật ký, nên tỷ lệ toàn kỳ chịu ảnh hưởng lớn của phạm vi thu thập.
 
 ### Cohort tháng có bất định và drift train–test
 
-Train có account 2010-01–2014-06; test 2014-07–2014-09 và không có nhãn. Hình giữ từng tháng, thêm Wilson 95% và ranh giới 2014-01 khi bắt đầu có sessions. Tháng ít user có khoảng rộng hơn; đường lên/xuống chưa chứng minh chất lượng khách hoặc mùa vụ.
+Train gồm người tạo tài khoản từ tháng 1/2010 đến tháng 6/2014. Test nối tiếp từ tháng 7 đến tháng 9/2014. Hình biểu diễn tỷ lệ đặt chỗ theo từng tháng cùng khoảng Wilson 95%. Vạch tại tháng 1/2014 đánh dấu thời kỳ bắt đầu có sessions. Nhóm tháng ít người có khoảng tin cậy rộng hơn, nên dao động của tỷ lệ cần được đọc cùng cỡ mẫu.
 
-Total variation trong [0,1] chỉ so sánh phân phối từng biến. Hai cột toàn kỳ và chỉ train 2014 giúp thấy phần thay đổi do thành phần cohort; chưa loại được drift trong năm hoặc drift quan hệ với nhãn. Các bảng khoảng thời gian và drift xuất hiện duy nhất tại đây; phụ lục chỉ giữ số liệu cohort tháng.
+Total variation (TV) đo mức khác nhau giữa hai phân phối của một biến, từ 0 (giống nhau) đến 1 (không giao nhau). Cột tv_all_train_vs_test so sánh toàn bộ train với test. Cột tv_train2014_vs_test giới hạn train ở năm 2014. Nếu TV giảm nhiều trong phép so sánh thứ hai, thành phần năm đăng ký là một yếu tố cần xem xét. Hai phép so sánh mô tả sự thay đổi phân phối đầu vào. Kiểm định mô hình theo thời gian ở phần 7 sẽ đánh giá khả năng dự báo khi dữ liệu thay đổi.
 
 **Khoảng thời gian account**
 
@@ -507,7 +543,7 @@ Total variation trong [0,1] chỉ so sánh phân phối từng biến. Hai cột
 
 ![account cohorts](figures/account_cohorts.png)
 
-Nhận xét: tháng 2010-01 chỉ có 61 user, booking rate 52.46% với Wilson 95% [40.16%; 64.47%]; vì vậy dao động ở cohort nhỏ cần đọc cùng bất định. Vạch đứt 2014-01 đánh dấu thay đổi độ phủ sessions, không phải bằng chứng về tác động riêng của thời gian đăng ký.
+Nhận xét: nhóm đăng ký tháng 2010-01 chỉ có 61 người. Tỷ lệ đặt chỗ là 52.46% với khoảng Wilson 95% từ 40.16% đến 64.47%. Vì cỡ mẫu nhỏ, ước lượng của tháng này có độ bất định lớn. Vạch đứt tháng 1/2014 đánh dấu thời kỳ bắt đầu có sessions.
 
 ## 6. Hạn chế, rủi ro và quyền riêng tư
 
@@ -528,9 +564,11 @@ Tách điều đã quan sát khỏi nguyên nhân chưa được chứng minh. K
 
 ### Baseline, mô hình chính và xác suất
 
-Chọn nhị phân first-booking theo nhãn nguồn làm bài toán chính. Binary 41,65%/58,35% không cần mặc định resampling hoặc class weight; lớp điểm đến hiếm không phải lý do cân bằng lại nhãn nhị phân.
+Thiết kế chính dự đoán nhãn y ở cấp người dùng. Hai nhóm y=1 và y=0 chiếm lần lượt 41,65% và 58,35%, nên thí nghiệm đầu tiên sẽ giữ phân phối lớp hiện có. Việc một số điểm đến có ít quan sát được xử lý riêng trong bối cảnh bài toán 12 lớp.
 
-CatBoost là ứng viên chính để kiểm tra, không phải kết luận đã thắng baseline. Tín hiệu EDA và tương tác chỉ là cơ sở đặt giả thuyết. Mọi quy tắc xử lý tuổi, NA/category hiếm và mọi thống kê dựa nhãn phải học riêng trong train của mỗi fold. ID và date_first_booking không làm đầu vào; sessions chưa thuộc thiết kế chính.
+Các nhóm kết hợp có tỷ lệ đặt chỗ khác nhau trong EDA. Vì CatBoost có thể biểu diễn các quan hệ như vậy, báo cáo đề xuất so sánh mô hình này với xác suất hằng và Logistic Regression có điều chuẩn L2. Kết quả đánh giá sẽ quyết định mô hình nào phù hợp hơn.
+
+Mỗi lượt chia dữ liệu có một tập huấn luyện riêng. Các quy tắc xử lý tuổi, giá trị thiếu, nhóm hiếm và thống kê dựa trên nhãn phải được học trong tập này rồi mới áp dụng cho tập kiểm định. Danh sách đầu vào của thiết kế chính loại ID, date_first_booking và sessions theo các bằng chứng ở phần 3 và phần 5.
 
 Nguồn thuật toán: [xử lý category của CatBoost](https://catboost.ai/docs/en/concepts/algorithm-main-stages_cat-to-numberic). Hiệu chỉnh phải tách khỏi dữ liệu fit; [scikit-learn về calibration](https://scikit-learn.org/stable/modules/calibration.html) cũng lưu ý Brier/log loss đánh giá cả calibration lẫn khả năng phân biệt.
 
@@ -545,11 +583,11 @@ Nguồn thuật toán: [xử lý category của CatBoost](https://catboost.ai/do
 
 ### Chia theo thời gian và kiểm soát đánh giá
 
-Thiết kế dưới đây được đặt trước lần huấn luyện đầu tiên. Rolling validation dùng để chọn cấu hình; sau đó refit đến hết 2014-03, calibration trên 2014-04, đánh giá nội bộ cuối trên 2014-05–06. Mỗi user chỉ một dòng và một giai đoạn trong từng fold; các cửa sổ học tích lũy giữa fold là có chủ đích. Test Kaggle 2014-07–09 không có nhãn, chỉ dùng đối chiếu schema/drift.
+Thiết kế đánh giá được đề xuất trước lần huấn luyện đầu tiên. Kiểm định theo các cửa sổ thời gian liên tiếp dùng để chọn cấu hình. Sau đó, mô hình được huấn luyện lại với dữ liệu đến hết tháng 3/2014, được hiệu chỉnh xác suất bằng dữ liệu tháng 4/2014 và được đánh giá cuối trên tháng 5–6/2014. Trong mỗi lượt chia, mỗi người dùng chỉ xuất hiện ở một giai đoạn. Tập huấn luyện mở rộng dần giữa các lượt chia. Test Kaggle tháng 7–9/2014 dùng để đối chiếu cấu trúc cột và phân phối vì tập này không có nhãn.
 
-Bảng chỉ kiểm kê quy mô các cửa sổ đề xuất, chưa tạo tập chia hoặc fit. Việc chia theo signup đánh giá thay đổi cohort, chưa mô phỏng đầy đủ một backtest tại thời điểm lịch: cần chứng minh nhãn train đã được đóng và có sẵn trước mỗi mốc dự đoán. Nếu sau này dùng horizon 90 ngày, phải thêm điều kiện trưởng thành nhãn trước origin; chưa được lấy booking tương lai để giả lập huấn luyện tại quá khứ.
+Bảng dưới kiểm kê số người dùng trong từng cửa sổ dự kiến. Để mô phỏng việc huấn luyện tại một thời điểm trong quá khứ, chỉ được dùng những nhãn đã có sẵn trước thời điểm đó. Với thời hạn 90 ngày, người mang nhãn âm trong tập huấn luyện phải hoàn tất đủ 90 ngày theo dõi trước mốc bắt đầu dự đoán của lượt chia. Điều kiện này cần được kiểm tra sau khi bổ sung thông tin theo dõi.
 
-Chọn tham số/early stopping bằng validation; chọn phương pháp calibration bằng dữ liệu phát triển, fit calibrator trên tháng 4. Giữ tập cuối cho một lần đánh giá sau khi khóa thiết kế. Các khoảng bootstrap đề xuất phải lấy mẫu theo user, seed=42; chưa chạy bootstrap.
+Tập kiểm định dùng để chọn tham số và thời điểm dừng huấn luyện. Dữ liệu phát triển dùng để chọn phương pháp hiệu chỉnh xác suất, sau đó bộ hiệu chỉnh được học trên tháng 4/2014. Tập đánh giá cuối chỉ được sử dụng sau khi đã chốt thiết kế. Khoảng tin cậy dự kiến được tính bằng cách lấy mẫu lặp lại theo người dùng (bootstrap), với seed=42.
 
 **Cửa sổ thời gian đề xuất và quy mô quan sát**
 
@@ -567,9 +605,9 @@ Chọn tham số/early stopping bằng validation; chọn phương pháp calibra
 
 ### Tiêu chí chấp nhận đặt trước
 
-Các mức 2%, 10%, 1,20, 2/3 điểm phần trăm và ngân sách top 20% là quy ước nghiên cứu đề xuất, không phải chuẩn phổ quát hoặc cam kết hiệu quả kinh doanh. Khi có chi phí/lợi ích thực tế cần chốt lại trước huấn luyện và ghi phiên bản protocol. Tất cả trạng thái hiện tại là chưa đánh giá.
+Bảng dưới đề xuất các mức cải thiện xác suất, khả năng xếp hạng và độ ổn định theo thời gian. Các ngưỡng 2%, 10%, 1,20, sai lệch 2 hoặc 3 điểm phần trăm và tỷ lệ ưu tiên 20% là quy ước cho thí nghiệm nghiên cứu. Khi có thông tin chi phí và lợi ích thực tế, cần chốt lại các mức này và ghi phiên bản thiết kế trước khi huấn luyện. Trạng thái hiện tại của các tiêu chí là chưa đánh giá.
 
-**Cổng chấp nhận cho giai đoạn mô hình hóa**
+**Điều kiện để chấp nhận kết quả mô hình**
 
 | criterion | predeclared_acceptance | interpretation |
 | --- | --- | --- |
@@ -582,9 +620,9 @@ Các mức 2%, 10%, 1,20, 2/3 điểm phần trăm và ngân sách top 20% là q
 
 ## 8. Bằng chứng về mức độ phù hợp
 
-**Kết luận lựa chọn:** Airbnb phù hợp nhất trong ba bộ cho nghiên cứu propensity booking đầu ở cấp user. Có cỡ mẫu và liên hệ mô tả để tiếp tục thiết kế nghiên cứu. Chưa đủ bằng chứng xác nhận một mô hình triển khai tại signup với horizon 90 ngày.
+**Kết luận lựa chọn:** trong ba bộ dữ liệu, Airbnb phù hợp nhất để nghiên cứu xác suất có lượt đặt chỗ đầu tiên ở cấp người dùng. Cỡ mẫu và các liên hệ quan sát được là cơ sở để tiến hành thí nghiệm mô hình sau khi xử lý các điều kiện dữ liệu trong bảng dưới.
 
-Các điều kiện về t0, ngoại lệ nhãn và thời gian theo dõi là cổng dữ liệu cần giải quyết; không được biến thành giả định ngầm để đánh dấu mọi tiêu chí đều đạt. Chưa làm sạch, thay thế tuổi/NA, mã hóa, tạo feature, tạo tập chia hay huấn luyện mô hình. Các nhóm, cờ và tổng sessions chỉ dùng để tính bảng EDA trong bộ nhớ.
+Ba việc cần hoàn tất là xác minh thông tin hồ sơ tại t0, làm rõ các ngoại lệ ngày đặt chỗ và xác nhận thời gian theo dõi của từng người dùng. Chúng quyết định khả năng sử dụng dữ liệu cho phương án dự đoán trong 90 ngày. Bảng dưới phân biệt tiêu chí đã có bằng chứng với điều kiện còn cần giải quyết.
 
 **Bảng kiểm mức độ phù hợp**
 
@@ -592,7 +630,7 @@ Các điều kiện về t0, ngoại lệ nhãn và thời gian theo dõi là c�
 | --- | --- | --- | --- |
 | Đủ tín hiệu | 10 category được sàng lọc V; gender V=0.207, trong 2014=0.251; có bảng tương tác/cohort | Đạt ở mức EDA | Chưa chứng minh dự báo ngoài mẫu; không dùng p-value thay AUC |
 | Đủ cỡ mẫu | 213,451 users; 88,908 booking; cohort 2014 76,466 | Đạt tổng thể | Một số category/ô tương tác ít user; dùng n và CI |
-| Nhãn tin cậy | Presence ngày booking khớp 100%; 29 độ trễ âm; max độ trễ 365 ngày | Cần xác minh | Chưa xác nhận horizon/follow-up của NDF và ngoại lệ trước account |
+| Nhãn tin cậy | Việc có ngày đặt chỗ khớp nhãn y ở 100% trường hợp. Có 29 độ trễ âm và độ trễ tối đa 365 ngày. | Cần xác minh | Cần ngày kết thúc theo dõi của người có y=0 và giải thích ngoại lệ trước ngày tạo tài khoản. |
 | Không rò rỉ | date_first_booking và presence tiết lộ nhãn; sessions chứa tên giao dịch, thiếu timestamp | Chưa đạt với toàn bộ raw | Thiết kế chính loại các nguồn này; cần audit lại trước fit |
 | Biến khả dụng tại t0 | t0 đã chọn: sau tạo account; raw không cung cấp lịch sử cập nhật hồ sơ | Cần xác minh | Xác nhận snapshot từng biến; ngày account không có giờ |
 | Ổn định theo thời gian | Booking rate/cohort, độ phủ sessions và TV category thay đổi; đã có đối chiếu cùng năm 2014 | Chưa đạt giả định ổn định | Dùng kiểm định theo thời gian, không coi train/test là IID |
@@ -611,7 +649,7 @@ Các điều kiện về t0, ngoại lệ nhãn và thời gian theo dõi là c�
 | id | object | 213,451 | 0 | 0 | Định danh người dùng | Khóa ghép sessions.user_id; không phải phép đo | định danh / khóa nhóm, không phải số liên tục | mã/nhãn phân loại, không có đơn vị vật lý | Khóa/mã; không in giá trị định danh cá nhân trong báo cáo |
 | date_account_created | object | 1,634 | 0 | 0 | Ngày tạo tài khoản | Mốc cohort; không tự xác định horizon nhãn | ứng viên hồ sơ tại signup; cần xác minh snapshot | ngày/giờ theo định dạng nguồn; timezone chưa xác minh | Toàn bảng: 2010-01-01–2014-06-30 |
 | timestamp_first_active | int64 | 213,451 | 0 | 0 | Lần hoạt động đầu, dạng YYYYMMDDHHMMSS | Có thể trước ngày tạo tài khoản; cần parse theo định dạng | ứng viên hồ sơ tại signup; cần xác minh snapshot | ngày/giờ theo định dạng nguồn; timezone chưa xác minh | Toàn bảng: [2.00903e+13, 2.01406e+13], 213451 giá trị phân biệt |
-| date_first_booking | object | 1,976 | 124,543 | 58.3473 | Ngày booking đầu được ghi nhận | Kết quả; presence tiết lộ nhãn có booking | kết quả; loại khỏi đầu vào tại signup | ngày/giờ theo định dạng nguồn; timezone chưa xác minh | Toàn bảng: 2010-01-02–2015-06-29 |
+| date_first_booking | object | 1,976 | 124,543 | 58.3473 | Ngày của lượt đặt chỗ đầu tiên | Kết quả. Việc có giá trị hay bị thiếu tiết lộ nhãn y. | kết quả; loại khỏi đầu vào tại signup | ngày/giờ theo định dạng nguồn; timezone chưa xác minh | Toàn bảng: 2010-01-02–2015-06-29 |
 | gender | object | 4 | 0 | 0 | Giới tính khai báo | -unknown- là sentinel, không phải giá trị biết rõ | ứng viên hồ sơ tại signup; cần xác minh snapshot | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: '-unknown-', 'FEMALE', 'MALE', 'OTHER' |
 | age | float64 | 127 | 87,990 | 41.2226 | Tuổi khai báo | Thiếu và giá trị ngoài dải tham chiếu; chưa sửa tuổi/năm sinh | ứng viên hồ sơ tại signup; cần xác minh snapshot | năm tuổi khai báo | Toàn bảng: [1, 2014], 127 giá trị phân biệt |
 | signup_method | object | 3 | 0 | 0 | Phương thức đăng ký | Biến phân loại | ứng viên hồ sơ tại signup; cần xác minh snapshot | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 'basic', 'facebook', 'google' |
@@ -623,7 +661,7 @@ Các điều kiện về t0, ngoại lệ nhãn và thời gian theo dõi là c�
 | signup_app | object | 4 | 0 | 0 | Ứng dụng đăng ký | Không đại diện mọi thiết bị dùng về sau | ứng viên hồ sơ tại signup; cần xác minh snapshot | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 'Android', 'Moweb', 'Web', 'iOS' |
 | first_device_type | object | 9 | 0 | 0 | Thiết bị đầu tiên | Khác device_type ở từng sự kiện sessions | ứng viên hồ sơ tại signup; cần xác minh snapshot | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 'Android Phone', 'Android Tablet', 'Desktop (Other)', 'Mac Desktop', 'Other/Unknown', 'SmartPhone (Other)', 'Windows Desktop', 'iPad', 'iPhone' |
 | first_browser | object | 52 | 0 | 0 | Trình duyệt đầu tiên | Có sentinel -unknown- | ứng viên hồ sơ tại signup; cần xác minh snapshot | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 52 giá trị khác nhau; top category tại phụ lục |
-| country_destination | object | 12 | 0 | 0 | Điểm đến booking đầu hoặc NDF | Target 12 lớp; 11 lớp khi chỉ xét có booking | đích | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 'AU', 'CA', 'DE', 'ES', 'FR', 'GB', 'IT', 'NDF', 'NL', 'PT', 'US', 'other' |
+| country_destination | object | 12 | 0 | 0 | Điểm đến của lượt đặt chỗ đầu tiên hoặc NDF | Cột điểm đến có 12 giá trị, được dùng để định nghĩa nhãn y. | đích | mã/nhãn phân loại, không có đơn vị vật lý | Toàn bảng: 'AU', 'CA', 'DE', 'ES', 'FR', 'GB', 'IT', 'NDF', 'NL', 'PT', 'US', 'other' |
 
 **So sánh schema train và test**
 
@@ -1083,9 +1121,9 @@ Các bảng ở đây không lặp các nhóm đã công bố trong phần chín
 | Palm Pre web browser | 1 | 1 | 100 | 20.6549 | 100 | 1 |
 | Stainless | 1 | 1 | 100 | 20.6549 | 100 | 1 |
 
-### Phân tầng và tương tác: Wilson 95% cho từng ô
+### Phân tầng và các nhóm kết hợp: Wilson 95% cho từng ô
 
-Dùng để đọc độ bất định của các ô heatmap; không phải kết quả mô hình.
+Các bảng cung cấp cỡ mẫu, tỷ lệ đặt chỗ và khoảng tin cậy cho từng ô trên bản đồ nhiệt.
 
 **signup_app × năm**
 
@@ -1321,7 +1359,7 @@ Số liệu đứng sau hình account_cohorts; không lặp lại bảng khoản
 
 ### Độ trễ trong các cohort tháng gần cuối train
 
-So 2014-01 đến 2014-06 để xem khác biệt trong các booking đã quan sát. Không gán thời gian theo dõi cho NDF từ phân phối dương; tỷ lệ trong ba cột horizon có mẫu số valid_observed_bookings.
+Bảng so sánh các nhóm đăng ký từ tháng 1 đến tháng 6/2014. Các tỷ lệ trong ba cột within30/60/90 có mẫu số valid_observed_bookings, tức số lượt đặt chỗ có độ trễ hợp lệ của nhóm. Thời gian theo dõi của người có y=0 cần được xác định riêng.
 
 **Cohort 2014: NDF và mức bao phủ booking quan sát**
 
@@ -1336,15 +1374,19 @@ So 2014-01 đến 2014-06 để xem khác biệt trong các booking đã quan s�
 
 ## Tái lập và kiểm soát phạm vi
 
-Notebook cần package scripts/ và năm CSV train_users_2.csv, test_users.csv, sessions.csv, countries.csv, age_gender_bkts.csv tại data/raw/AIRBNB/. Chỉ nộp một file notebook thì xem được output lưu sẵn, chưa thể chạy lại độc lập. Ô mở đầu notebook ghi cấu trúc thư mục và cách cài đúng các thư viện EDA; raw không được đính kèm repo.
+Để chạy lại notebook, cần thư mục scripts/ và năm CSV train_users_2.csv, test_users.csv, sessions.csv, countries.csv, age_gender_bkts.csv tại data/raw/AIRBNB/. Notebook đã lưu kết quả để đọc trực tiếp. Ô mở đầu hướng dẫn chuẩn bị thư mục và cài thư viện EDA. Dữ liệu gốc được lấy riêng theo hướng dẫn vì không được đính kèm kho mã.
 
-Từ thư mục gốc chạy: python scripts/build_descriptive_reports.py --dataset AIRBNB. Hoặc mở notebook bằng Jupyter, Restart Kernel và Run All. Script chỉ đọc CSV raw, xuất Markdown, JSON, hình và notebook có output thật; không tạo data/processed, tập feature, tập chia train/test hay mô hình.
+Từ thư mục gốc, chạy `python scripts/build_descriptive_reports.py --dataset AIRBNB`. Cách khác là mở notebook bằng Jupyter, chọn Restart Kernel rồi Run All. Script đọc CSV gốc và xuất báo cáo Markdown, metadata JSON, hình và notebook có kết quả thực thi.
 
-Ngày tải **không được lưu**, đã được người cung cấp xác nhận ngày 2026-11-02. Mã phiên bản Kaggle cũng chưa có bằng chứng. Không điền một ngày giả định: snapshot local được định danh bằng SHA-256 từng file và hash danh mục có thứ tự ở metadata. Ngày phân tích theo Asia/Ho_Chi_Minh khác với ngày tải.
+Người cung cấp xác nhận ngày 2026-11-02 rằng **ngày tải dữ liệu không được lưu**. Mã phiên bản Kaggle cũng chưa được ghi nhận. Vì vậy, bản dữ liệu đang dùng được nhận diện bằng SHA-256 của từng file và của danh mục file có thứ tự trong metadata. Ngày phân tích được ghi theo múi giờ Asia/Ho_Chi_Minh.
 
-Mọi bảng dùng toàn bộ user hoặc toàn bộ sessions có khóa hợp lệ trong phạm vi ghi cạnh bảng. Chỉ mẫu hình thiếu hiển thị tối đa 300 dòng, seed=42. Cramér V dùng chi-square không hiệu chỉnh Yates; p chi-square là xấp xỉ, kèm tỷ lệ ô kỳ vọng dưới 5. Mann–Whitney hai phía dùng xấp xỉ có hiệu chỉnh ties; rank-biserial = 2U/(n_booked × n_NDF) − 1. BH điều chỉnh 14 phép sàng lọc toàn kỳ; không áp dụng ngưỡng p để tự động chọn feature. Wilson 95% giả định user độc lập và không bao gồm sai lệch chọn mẫu/cohort. Không bootstrap, fit, tối ưu tham số hay tính chất lượng mô hình trong lần chạy EDA.
+Các bảng dùng toàn bộ người dùng hoặc toàn bộ sessions có khóa hợp lệ trong phạm vi ghi cạnh bảng. Hình về mẫu thiếu chỉ hiển thị tối đa 300 dòng với seed=42.
 
-Output được tính lại trong lần phân tích hiện tại; môi trường dưới đây và SHA-256 ba module dựng báo cáo trong metadata nhận diện code đã chạy. Các đề xuất thuật toán, cửa sổ chia tập và ngưỡng chấp nhận chưa được thực thi.
+Phép tính Cramér V dùng chi-square không hiệu chỉnh Yates. Bảng báo p-value xấp xỉ và tỷ lệ ô có tần số kỳ vọng dưới 5 để kiểm tra độ phù hợp của xấp xỉ. Kiểm định Mann–Whitney hai phía dùng xấp xỉ có hiệu chỉnh các giá trị đồng hạng. Hệ số rank-biserial được tính bằng 2U/(n_y1 × n_y0) − 1. Trong công thức này, U là thống kê Mann–Whitney với nhóm y=1 đứng trước, còn n_y1 và n_y0 là cỡ mẫu hai nhóm.
+
+Phương pháp Benjamini–Hochberg (BH) điều chỉnh p-value cho 14 phép kiểm định trên toàn kỳ và cho ra giá trị q trong bảng. Việc chọn biến sẽ được kiểm tra bằng thí nghiệm mô hình. Khoảng Wilson 95% giả định các người dùng độc lập. Khoảng này mô tả bất định của tỷ lệ, đồng thời cần xem xét riêng sai lệch chọn mẫu và khác biệt giữa các nhóm đăng ký.
+
+Các kết quả được tính lại trong lần phân tích hiện tại. Bảng môi trường dưới đây và SHA-256 của ba module dựng báo cáo trong metadata nhận diện mã đã chạy. Thuật toán, cửa sổ chia dữ liệu, bootstrap và ngưỡng chấp nhận ở phần 7 là thiết kế cho giai đoạn tiếp theo.
 
 **Môi trường thực thi chính xác**
 

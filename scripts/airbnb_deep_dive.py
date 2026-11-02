@@ -22,6 +22,7 @@ CATEGORICAL = [
 ]
 TRANSACTION_PATTERN = r"(?:^|_)(?:book[a-z]*|reserv[a-z]*|pay[a-z]*|checkout|receipt|itinerar[a-z]*|confirm[a-z]*|request[a-z]*|billing)(?:_|$)"
 AIRBNB_LAYOUT = [
+    ("glossary", "Thuật ngữ và cách đọc báo cáo"),
     ("executive", "Tóm tắt điều hành"),
     ("problem", "1. Bài toán và lý do chọn dữ liệu"),
     ("overview", "2. Tổng quan bộ dữ liệu"),
@@ -268,15 +269,19 @@ def proposed_protocol(train, account):
 
 def reproducibility_section(report, environment):
     return section("reproducibility", "Tái lập và kiểm soát phạm vi", """
-Notebook cần package scripts/ và năm CSV train_users_2.csv, test_users.csv, sessions.csv, countries.csv, age_gender_bkts.csv tại data/raw/AIRBNB/. Chỉ nộp một file notebook thì xem được output lưu sẵn, chưa thể chạy lại độc lập. Ô mở đầu notebook ghi cấu trúc thư mục và cách cài đúng các thư viện EDA; raw không được đính kèm repo.
+Để chạy lại notebook, cần thư mục scripts/ và năm CSV train_users_2.csv, test_users.csv, sessions.csv, countries.csv, age_gender_bkts.csv tại data/raw/AIRBNB/. Notebook đã lưu kết quả để đọc trực tiếp. Ô mở đầu hướng dẫn chuẩn bị thư mục và cài thư viện EDA. Dữ liệu gốc được lấy riêng theo hướng dẫn vì không được đính kèm kho mã.
 
-Từ thư mục gốc chạy: python scripts/build_descriptive_reports.py --dataset AIRBNB. Hoặc mở notebook bằng Jupyter, Restart Kernel và Run All. Script chỉ đọc CSV raw, xuất Markdown, JSON, hình và notebook có output thật; không tạo data/processed, tập feature, tập chia train/test hay mô hình.
+Từ thư mục gốc, chạy `python scripts/build_descriptive_reports.py --dataset AIRBNB`. Cách khác là mở notebook bằng Jupyter, chọn Restart Kernel rồi Run All. Script đọc CSV gốc và xuất báo cáo Markdown, metadata JSON, hình và notebook có kết quả thực thi.
 
-Ngày tải **không được lưu**, đã được người cung cấp xác nhận ngày 2026-11-02. Mã phiên bản Kaggle cũng chưa có bằng chứng. Không điền một ngày giả định: snapshot local được định danh bằng SHA-256 từng file và hash danh mục có thứ tự ở metadata. Ngày phân tích theo Asia/Ho_Chi_Minh khác với ngày tải.
+Người cung cấp xác nhận ngày 2026-11-02 rằng **ngày tải dữ liệu không được lưu**. Mã phiên bản Kaggle cũng chưa được ghi nhận. Vì vậy, bản dữ liệu đang dùng được nhận diện bằng SHA-256 của từng file và của danh mục file có thứ tự trong metadata. Ngày phân tích được ghi theo múi giờ Asia/Ho_Chi_Minh.
 
-Mọi bảng dùng toàn bộ user hoặc toàn bộ sessions có khóa hợp lệ trong phạm vi ghi cạnh bảng. Chỉ mẫu hình thiếu hiển thị tối đa 300 dòng, seed=42. Cramér V dùng chi-square không hiệu chỉnh Yates; p chi-square là xấp xỉ, kèm tỷ lệ ô kỳ vọng dưới 5. Mann–Whitney hai phía dùng xấp xỉ có hiệu chỉnh ties; rank-biserial = 2U/(n_booked × n_NDF) − 1. BH điều chỉnh 14 phép sàng lọc toàn kỳ; không áp dụng ngưỡng p để tự động chọn feature. Wilson 95% giả định user độc lập và không bao gồm sai lệch chọn mẫu/cohort. Không bootstrap, fit, tối ưu tham số hay tính chất lượng mô hình trong lần chạy EDA.
+Các bảng dùng toàn bộ người dùng hoặc toàn bộ sessions có khóa hợp lệ trong phạm vi ghi cạnh bảng. Hình về mẫu thiếu chỉ hiển thị tối đa 300 dòng với seed=42.
 
-Output được tính lại trong lần phân tích hiện tại; môi trường dưới đây và SHA-256 ba module dựng báo cáo trong metadata nhận diện code đã chạy. Các đề xuất thuật toán, cửa sổ chia tập và ngưỡng chấp nhận chưa được thực thi.
+Phép tính Cramér V dùng chi-square không hiệu chỉnh Yates. Bảng báo p-value xấp xỉ và tỷ lệ ô có tần số kỳ vọng dưới 5 để kiểm tra độ phù hợp của xấp xỉ. Kiểm định Mann–Whitney hai phía dùng xấp xỉ có hiệu chỉnh các giá trị đồng hạng. Hệ số rank-biserial được tính bằng 2U/(n_y1 × n_y0) − 1. Trong công thức này, U là thống kê Mann–Whitney với nhóm y=1 đứng trước, còn n_y1 và n_y0 là cỡ mẫu hai nhóm.
+
+Phương pháp Benjamini–Hochberg (BH) điều chỉnh p-value cho 14 phép kiểm định trên toàn kỳ và cho ra giá trị q trong bảng. Việc chọn biến sẽ được kiểm tra bằng thí nghiệm mô hình. Khoảng Wilson 95% giả định các người dùng độc lập. Khoảng này mô tả bất định của tỷ lệ, đồng thời cần xem xét riêng sai lệch chọn mẫu và khác biệt giữa các nhóm đăng ký.
+
+Các kết quả được tính lại trong lần phân tích hiện tại. Bảng môi trường dưới đây và SHA-256 của ba module dựng báo cáo trong metadata nhận diện mã đã chạy. Thuật toán, cửa sổ chia dữ liệu, bootstrap và ngưỡng chấp nhận ở phần 7 là thiết kế cho giai đoạn tiếp theo.
 """, [("Môi trường thực thi chính xác", environment)])
 
 
@@ -300,7 +305,7 @@ def deepen_airbnb(report, train, test, account, first, per_user, action_counts):
     values = lag[valid]
     fig, axes = plt.subplots(1, 2, figsize=(13.5, 4.5))
     axes[0].hist(values, bins=np.arange(0, 381, 15), color=BLUE, edgecolor="white")
-    axes[0].set(title="Độ trễ đến booking đầu được ghi nhận", xlabel="Ngày từ tạo tài khoản đến booking", ylabel="Số người có booking và độ trễ ≥ 0")
+    axes[0].set(title="Độ trễ đến lượt đặt chỗ đầu tiên", xlabel="Ngày từ tạo tài khoản đến booking", ylabel="Số người có booking và độ trễ ≥ 0")
     x = np.sort(values.to_numpy())
     axes[1].plot(x, np.arange(1, len(x)+1)/len(x)*100, color=ORANGE)
     horizon_labels = []
@@ -312,29 +317,33 @@ def deepen_airbnb(report, train, test, account, first, per_user, action_counts):
                  fontsize=10, bbox={"facecolor":"white","edgecolor":"#c9d2d9","pad":8})
     axes[1].set(title="Tỷ lệ tích lũy trong các booking quan sát hợp lệ", xlabel="Độ trễ (ngày)", ylabel="Tỷ lệ booking có độ trễ ≤ x (%)", ylim=(0, 103), xlim=(0, 365))
     fig.tight_layout(); delay_figure = report.savefig("booking_delay", fig)
-    fig_note(report, delay_figure, f"Nhận xét: trong {len(values):,} booking có độ trễ không âm, {coverage_at(30):.2f}% xảy ra trong 30 ngày, {coverage_at(60):.2f}% trong 60 ngày và {coverage_at(90):.2f}% trong 90 ngày. Đây là phân phối có điều kiện trên người đã book; chưa xác định thời gian theo dõi của NDF. {int(lag.lt(0).sum())} độ trễ âm được báo riêng, không xóa khỏi raw.")
+    fig_note(report, delay_figure, f"Nhận xét: trong {len(values):,} lượt đặt chỗ có độ trễ không âm, {coverage_at(30):.2f}% xảy ra trong 30 ngày, {coverage_at(60):.2f}% trong 60 ngày và {coverage_at(90):.2f}% trong 90 ngày. Phần tăng thêm từ ngày 30 đến ngày 90 cho thấy lợi ích về mức bao phủ khi kéo dài thời hạn. Mẫu số chỉ gồm các lượt đặt chỗ có độ trễ hợp lệ. Bảng ngoại lệ thống kê riêng {int(lag.lt(0).sum())} trường hợp độ trễ âm.")
     delay_section = section("booking_delay", "Độ trễ booking và giới hạn định nghĩa nhãn", f"""
-Độ trễ = date_first_booking − date_account_created, tính bằng ngày lịch; ngày booking chỉ dùng để kiểm tra nhãn. Có {len(values):,} độ trễ không âm và {int(lag.lt(0).sum())} độ trễ âm. Không diễn giải độ trễ âm là booking tương lai và không sửa chúng trong EDA.
+Độ trễ là số ngày lịch từ ngày tạo tài khoản đến ngày đặt chỗ đầu tiên, tính bằng date_first_booking − date_account_created. Có {len(values):,} lượt đặt chỗ có độ trễ không âm. Báo cáo thống kê riêng {int(lag.lt(0).sum())} trường hợp có ngày đặt chỗ trước ngày tạo tài khoản để kiểm tra lại định nghĩa thời gian.
 
-**Cửa sổ 90 ngày bao phủ {coverage_at(90):.2f}% booking quan sát có độ trễ hợp lệ**, còn khoảng {100-coverage_at(90):.2f}% nằm sau 90 ngày. Các tỷ lệ dưới đây không phải xác suất booking 30/60/90 ngày của toàn bộ user.
+**Trong các lượt đặt chỗ có độ trễ hợp lệ, {coverage_at(90):.2f}% xảy ra trong 90 ngày đầu** và {100-coverage_at(90):.2f}% xảy ra muộn hơn. Vì mẫu số chỉ gồm người đã đặt chỗ, các tỷ lệ này mô tả tốc độ phát sinh đặt chỗ trong nhóm đó. Xác suất đặt chỗ của toàn bộ người dùng cần một mẫu số khác, gồm cả người mang nhãn y=0.
 
-Ngày booking lớn nhất là {pd.to_datetime(train.date_first_booking).max().date()}. Độ trễ lớn nhất ở cả năm cohort là 365 ngày. Điều này phù hợp với giả thuyết nhãn có giới hạn khoảng một năm theo từng user, nhưng chưa chứng minh cơ chế đóng nhãn hoặc thời gian theo dõi của NDF. **Không thể kết luận NDF ở cohort mới chỉ là chưa kịp booking, cũng chưa thể bác bỏ khả năng đó.**
+Ngày đặt chỗ muộn nhất là {pd.to_datetime(train.date_first_booking).max().date()}. Độ trễ lớn nhất trong mỗi nhóm năm tạo tài khoản đều là 365 ngày. Mẫu hình này gợi ý cần kiểm tra liệu dữ liệu có giới hạn theo dõi một năm cho từng người dùng hay không. Câu trả lời quyết định cách diễn giải nhãn y=0, nhất là ở các nhóm đăng ký gần cuối tập train.
 
-Nếu giả định mọi user đều được theo dõi tới ngày booking lớn nhất, toàn bộ train có khoảng cách lịch đủ 30/60/90 ngày. Đây là phân tích độ nhạy theo một giả định chưa kiểm chứng, không phải bằng chứng xác nhận NDF đã trưởng thành. Bài toán chính dùng nhãn nguồn; 90 ngày là horizon triển khai cần dữ liệu bổ sung để xác nhận nhãn âm.
+Để xem kết quả phụ thuộc vào thời gian theo dõi như thế nào, báo cáo thử giả định mọi người dùng đều được theo dõi đến ngày đặt chỗ muộn nhất. Theo giả định này, toàn bộ train có khoảng cách lịch đủ 30, 60 và 90 ngày. Ngày kết thúc theo dõi thực tế vẫn cần được bổ sung để xác nhận ai đã được theo dõi đủ 90 ngày mà không đặt chỗ. Trong phạm vi hiện tại, bài toán dùng nhãn y được định nghĩa từ cột country_destination.
 """, [("Phân phối độ trễ: mẫu số và ngoại lệ", lag_summary),
-      ("Mức bao phủ các horizon trên booking đã quan sát", horizons),
+      ("Mức bao phủ các thời hạn trên lượt đặt chỗ đã ghi nhận", horizons),
       ("Độ trễ theo năm tạo tài khoản", lag_cohorts),
-      ("Giả định chung ngày đóng nhãn: chỉ là độ nhạy", followup)], [delay_figure])
+      ("Phân tích độ nhạy khi giả định cùng ngày kết thúc theo dõi", followup)], [delay_figure])
 
     # Full candidate audit: 10 categorical fields, age and two original dates.
-    signal_section = section("signal", "Độ mạnh liên hệ với nhãn trên toàn bộ biến ứng viên", """
-Phạm vi sàng lọc gồm 13 cột ứng viên gốc: 10 biến phân loại, age và hai mốc thời gian. Cờ thiếu tuổi là một góc nhìn EDA bổ sung, không được xuất thành feature. Ngày tạo account/hoạt động đầu được nhóm theo tháng chỉ để mô tả cohort. ID, nhãn và date_first_booking không được dùng để chứng minh tín hiệu đầu vào.
+    signal_section = section("signal", "Độ mạnh liên hệ với nhãn y trên toàn bộ biến ứng viên", f"""
+Phân tích xem xét 13 cột ứng viên gốc, gồm 10 biến phân loại, age và hai mốc thời gian. Cờ thiếu tuổi bổ sung góc nhìn về mức độ đầy đủ của hồ sơ. Hai mốc thời gian được nhóm theo tháng để mô tả nhóm đăng ký. ID, country_destination và date_first_booking được loại khỏi danh sách biến ứng viên.
 
-Cramér V = sqrt(chi-square / [n × min(r−1,c−1)]), trong [0,1]; càng lớn là liên hệ biên càng mạnh. Cột effect_2014 tính lại trên cohort 2014 để kiểm tra ảnh hưởng thành phần năm. Không áp một ngưỡng V chung để tuyên bố biến hữu ích cho mô hình. P-value nhỏ khi n lớn chưa đảm bảo hiệu ứng có giá trị; các category hiếm làm kiểm định chi-square xấp xỉ kém hơn.
+Cramér V = sqrt(chi-square / [n × min(r−1,c−1)]), với r và c là số hàng và cột của bảng chéo. V nằm trong [0,1] và tăng khi liên hệ giữa hai biến mạnh hơn. Cột effect_all mô tả toàn bộ train. Cột effect_2014 tính riêng cho người tạo tài khoản năm 2014 để đối chiếu ảnh hưởng của thành phần năm.
 
-Tuổi được kiểm định Mann–Whitney hai phía trong cửa sổ tham chiếu 16–100, kèm rank-biserial trong [−1,1]. Dấu dương nghĩa tuổi ở nhóm booked có xu hướng cao hơn NDF; trị tuyệt đối gần 0 là khác biệt nhỏ. Không so trực tiếp trị số rank-biserial với V như cùng một thang đo. Tuổi ngoài dải và NA vẫn được báo riêng.
+**Cách đọc kết quả:** gender có V={v_by_name.loc['gender','effect_all']:.3f} trên toàn kỳ và {v_by_name.loc['gender','effect_2014']:.3f} trong năm 2014. Báo cáo diễn giải mức khoảng 0,2 này là liên hệ yếu đến vừa. signup_app có V={v_by_name.loc['signup_app','effect_all']:.3f} và {v_by_name.loc['signup_app','effect_2014']:.3f}, thể hiện liên hệ yếu hơn gender trong cả hai phạm vi. Đây là cách diễn giải mô tả trên thang 0–1, không phải ngưỡng chung để chọn biến. Các kết quả cho thấy nên kiểm tra giá trị bổ sung của hai biến khi huấn luyện.
 
-Đây là bằng chứng **liên hệ thống kê trong mẫu**, thay cho việc bịa ra AUC ở giai đoạn chưa train; chưa chứng minh khả năng dự báo ngoài thời gian hoặc tác động nhân quả. Nguồn phương pháp: [Cramér V của SciPy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.contingency.association.html), [Mann–Whitney của SciPy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.mannwhitneyu.html).
+Tuổi trong dải tham chiếu 16–100 được so sánh giữa hai nhóm nhãn y bằng kiểm định Mann–Whitney hai phía. Hệ số rank-biserial đi kèm nằm trong [−1,1]. Dấu dương cho biết tuổi ở nhóm y=1 có xu hướng cao hơn nhóm y=0. Trị tuyệt đối gần 0 cho biết khác biệt về thứ hạng tuổi rất nhỏ. Vì rank-biserial và Cramér V đo hai dạng liên hệ khác nhau, chúng cần được diễn giải riêng. Tuổi ngoài dải và tuổi thiếu có thống kê riêng.
+
+Bảng giữ p-value và giá trị q sau điều chỉnh nhiều phép kiểm định để người đọc kiểm tra phương pháp. Với cỡ mẫu lớn, cần đọc chúng cùng độ mạnh liên hệ. Tỷ lệ ô có tần số kỳ vọng dưới 5 giúp nhận biết những kiểm định chi-square có xấp xỉ kém tin cậy hơn.
+
+Báo cáo này không đưa AUC vì chưa huấn luyện mô hình. Nguồn phương pháp: [Cramér V của SciPy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.contingency.association.html), [Mann–Whitney của SciPy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.mannwhitneyu.html).
 """, [("Độ mạnh liên hệ toàn kỳ và trong cohort 2014; nêu đủ 14 phép sàng lọc", association)])
 
     frame["age_group_eda"] = pd.cut(frame.age, [15, 24, 34, 44, 54, 64, 100], labels=["16–24", "25–34", "35–44", "45–54", "55–64", "65–100"]).astype("object")
@@ -352,7 +361,7 @@ Tuổi được kiểm định Mann–Whitney hai phía trong cửa sổ tham ch
             target_tables.append((f"Booking theo {c} — toàn bộ nhóm", table))
     for c in [c for c in CATEGORICAL if c not in display_columns]:
         extra_tables.append((f"Booking theo {c} — bổ sung", rate_table(frame, c, "observed_booking")))
-    target_section = section("target_rates", "Tỷ lệ booking theo hồ sơ, kênh, thiết bị và missing tuổi", "Mỗi mẫu số là user trong nhóm. Bảng có n, số booking, tỷ lệ và Wilson 95%; n<100 là cờ thận trọng. Giữ riêng NA, giá trị unknown và tuổi ngoài dải. Các chênh lệch ở đây là liên hệ biên, được đối chiếu với phân tầng năm ở phần tiếp theo.", target_tables)
+    target_section = section("target_rates", "Tỷ lệ đặt chỗ theo hồ sơ, kênh, thiết bị và tình trạng thiếu tuổi", "Mỗi tỷ lệ được tính trên số người dùng trong nhóm. Cột n là số người dùng, positive là số người có nhãn y=1, rate_pct là tỷ lệ phần trăm. Hai cột ci95_low_pct và ci95_high_pct là cận dưới và cận trên của khoảng Wilson 95%. Nhóm có n<100 được đánh dấu vì ước lượng có thể kém chính xác. Các bảng giữ riêng NA, unknown và tuổi ngoài dải tham chiếu. Phần tiếp theo so sánh các nhóm trong từng năm đăng ký để xem chênh lệch thay đổi như thế nào.", target_tables)
 
     # Within-year comparison, with explicit absent cells and cell counts.
     fig = plt.figure(figsize=(22, 7), layout="constrained")
@@ -367,11 +376,11 @@ Tuổi được kiểm định Mann–Whitney hai phía trong cửa sổ tham ch
         im = heatmap_rates(ax, r, n, f"{labels[c]} và năm tạo tài khoản", "Năm tạo tài khoản", labels[c])
     fig.colorbar(im, cax=color_axis, label="Có booking được ghi nhận (%)")
     strata_figure = report.savefig("cohort_strata", fig)
-    fig_note(report, strata_figure, f"Nhận xét: riêng năm 2014, Web có booking rate {app2014.loc['Web','rate_pct']:.2f}% so với iOS {app2014.loc['iOS','rate_pct']:.2f}% và Android {app2014.loc['Android','rate_pct']:.2f}%; chênh lệch app vẫn hiện diện trong cùng năm. FEMALE đạt {gender2014.loc['FEMALE','rate_pct']:.2f}% so với gender unknown {gender2014.loc['-unknown-','rate_pct']:.2f}%. Nhóm OTHER chỉ có {int(gender2014.loc['OTHER','n'])} user 2014 nên cần đọc Wilson ở phụ lục. Dấu * là n<100. Phân tầng năm chưa kiểm soát nhiễu theo tháng hoặc biến khác.")
+    fig_note(report, strata_figure, f"Nhận xét: trong năm 2014, tỷ lệ đặt chỗ của Web là {app2014.loc['Web','rate_pct']:.2f}%, iOS là {app2014.loc['iOS','rate_pct']:.2f}% và Android là {app2014.loc['Android','rate_pct']:.2f}%. Chênh lệch giữa các ứng dụng vẫn xuất hiện khi so sánh trong cùng năm. Nhóm FEMALE có tỷ lệ {gender2014.loc['FEMALE','rate_pct']:.2f}%, so với {gender2014.loc['-unknown-','rate_pct']:.2f}% ở nhóm giới tính unknown. Nhóm OTHER chỉ có {int(gender2014.loc['OTHER','n'])} người nên cần đọc cùng khoảng Wilson trong phụ lục. Dấu * đánh dấu ô có n<100.")
     strata_section = section("cohort_strata", "Tách thành phần cohort khỏi chênh lệch app, gender và kênh", """
-Đọc theo từng cột năm để so sánh các nhóm trong cùng cohort. Một số ứng dụng không xuất hiện ở năm đầu nên không thể chuẩn hóa ngây thơ mọi nhóm theo cùng cơ cấu 2010–2014. Bảng tỷ lệ toàn kỳ không được dùng để kết luận app/kênh/giới tính gây tăng booking.
+Mỗi cột trong bảng tương ứng với một năm tạo tài khoản. Đọc theo cột giúp so sánh ứng dụng, giới tính hoặc kênh tiếp cận trong cùng nhóm đăng ký. Một số ứng dụng chỉ xuất hiện ở các năm sau, nên so sánh toàn kỳ có thể chịu ảnh hưởng của thành phần năm.
 
-Ngay cả khi chênh lệch còn trong một năm, đó vẫn là liên hệ sau phân tầng năm, chưa phải ước lượng nhân quả hoặc đã kiểm soát mọi nhiễu. Bảng dài với Wilson 95% nằm ở phụ lục để kiểm tra các ô n nhỏ.
+Việc tách theo năm giúp kiểm tra một phần ảnh hưởng này. Khác biệt theo tháng hoặc các đặc điểm khác vẫn cần được xem xét khi xây dựng mô hình. Phụ lục cung cấp khoảng Wilson 95% cho từng ô để đọc cùng số người dùng.
 """, [(f"{c} × năm signup: tỷ lệ và n", compact_strata(t, c)) for c, t in strata.items()], [strata_figure])
 
     interaction_tables = []
@@ -390,8 +399,8 @@ Ngay cả khi chênh lệch còn trong một năm, đó vẫn là liên hệ sau
     interaction_figure = report.savefig("multivariate", fig)
     app_channel = interaction_tables[0][1].set_index(["signup_app","affiliate_channel"])
     missing_gender = interaction_tables[1][1].set_index(["age_missing_eda","gender"])
-    fig_note(report, interaction_figure, f"Nhận xét: trong user Web năm 2014, nhóm direct có booking rate {app_channel.loc[('Web','direct'),'rate_pct']:.2f}% (n={int(app_channel.loc[('Web','direct'),'n']):,}), nhóm content {app_channel.loc[('Web','content'),'rate_pct']:.2f}% (n={int(app_channel.loc[('Web','content'),'n']):,}). Trong nhóm FEMALE cùng năm, có tuổi đạt {missing_gender.loc[('Có tuổi','FEMALE'),'rate_pct']:.2f}% so với thiếu tuổi {missing_gender.loc[('Thiếu tuổi','FEMALE'),'rate_pct']:.2f}%. Dấu * là n<100. Liên hệ không chỉ do trộn các năm, nhưng vẫn chưa chứng minh quan hệ nhân quả hoặc mô hình phi tuyến sẽ thắng baseline.")
-    interaction_section = section("interactions", "Tương tác liên quan đến nhãn trong cohort 2014", "Thay biểu đồ hai trục ngày gần trùng nhau bằng signup_app × affiliate_channel và missing tuổi × gender. Nhóm tuổi/cờ thiếu chỉ tồn tại để tính bảng và hình EDA; chưa xuất dữ liệu đầu vào. Không kiểm định tương tác hàng loạt hoặc tự chọn feature từ hình.", figures=[interaction_figure])
+    fig_note(report, interaction_figure, f"Nhận xét: với người dùng Web năm 2014, nhóm direct có tỷ lệ đặt chỗ {app_channel.loc[('Web','direct'),'rate_pct']:.2f}% (n={int(app_channel.loc[('Web','direct'),'n']):,}). Nhóm content có tỷ lệ {app_channel.loc[('Web','content'),'rate_pct']:.2f}% (n={int(app_channel.loc[('Web','content'),'n']):,}). Trong nhóm FEMALE cùng năm, tỷ lệ của người có tuổi là {missing_gender.loc[('Có tuổi','FEMALE'),'rate_pct']:.2f}%, so với {missing_gender.loc[('Thiếu tuổi','FEMALE'),'rate_pct']:.2f}% ở người thiếu tuổi. Các chênh lệch trong cùng năm là cơ sở để kiểm tra giá trị của những nhóm kết hợp khi huấn luyện. Dấu * đánh dấu ô có n<100.")
+    interaction_section = section("interactions", "Tỷ lệ đặt chỗ theo các nhóm kết hợp trong năm 2014", "Hai biểu đồ kết hợp ứng dụng đăng ký với kênh tiếp cận, và tình trạng thiếu tuổi với giới tính khai báo. Cách nhìn này giúp xác định những nhóm cần kiểm tra thêm trong mô hình. Màu biểu diễn tỷ lệ đặt chỗ, còn n cho biết số người dùng trong ô. Dấu * đánh dấu ô có dưới 100 người. Các nhóm và cờ thiếu được tính tạm để lập bảng EDA.", figures=[interaction_figure])
 
     recent_users = int(is2014.sum())
     recent_logs = int(train.loc[is2014, "id"].isin(per_user.index).sum())
@@ -402,23 +411,23 @@ Ngay cả khi chênh lệch còn trong một năm, đó vẫn là liên hệ sau
     receipt = trans[(trans.field=="action") & trans.value.eq("receipt")].iloc[0]
     requested = trans[(trans.field=="action") & trans.value.eq("requested")].iloc[0]
     session_section = section("sessions_evidence", "Sessions: so sánh cùng cohort và rà soát thông tin giao dịch", f"""
-Đã quét toàn bộ {report.facts['sessions']:,} sự kiện. So sánh phù hợp hơn là **train cohort 2014: {recent_logs:,}/{recent_users:,} ({coverage_recent:.2f}%)** với **test cohort 2014: {coverage_test:.2f}%**; chênh {coverage_test-coverage_recent:.2f} điểm phần trăm. Tỷ lệ train toàn kỳ 34,58% chủ yếu phản ánh việc cohort 2010–2013 không có log, không phải bằng chứng user ít hoạt động.
+Phân tích đã quét toàn bộ {report.facts['sessions']:,} sự kiện. Trong nhóm đăng ký năm 2014, **{recent_logs:,}/{recent_users:,} người dùng train có sessions ({coverage_recent:.2f}%)**. Tỷ lệ tương ứng ở test là **{coverage_test:.2f}%**, cao hơn {coverage_test-coverage_recent:.2f} điểm phần trăm. Tỷ lệ trên toàn bộ train chỉ là 34,58% vì nhóm đăng ký năm 2010–2013 không có nhật ký trong dữ liệu hiện có. Vì vậy, cần so sánh độ phủ trong cùng năm đăng ký.
 
-**Về độ phủ, nghiên cứu sessions phải giới hạn cohort 2014 ({recent_users:,} user train), trong đó {recent_logs:,} có log.** Về thời điểm dự đoán, sessions vẫn chưa đủ điều kiện: không có timestamp nên không cắt được trước t0. Giới hạn cohort không tự loại được rò rỉ thời gian.
+Nghiên cứu riêng sessions có phạm vi phù hợp là {recent_users:,} người dùng train đăng ký năm 2014. Tuy nhiên, thiết kế dự đoán tại t0 cần biết sự kiện nào đã xảy ra trước thời điểm đó. Vì sessions thiếu thời điểm sự kiện, thiết kế chính loại nguồn này khỏi đầu vào cho đến khi xác minh được khoảng thời gian ghi nhật ký.
 
-Bảng có/không có log dưới đây chỉ xét 2014. Bảng số sự kiện giữ cả user không có log với event_n=0 để không nhầm mẫu số. Thời lượng secs_elapsed không phải timestamp và tổng thời lượng không chứng minh thứ tự hành động.
+Bảng dưới so sánh người có và không có sessions trong năm 2014. Bảng số sự kiện giữ cả người không có nhật ký và gán event_n=0 khi tính thống kê. Cột secs_elapsed là thời lượng, nên không xác định được thời điểm hoặc thứ tự hành động.
 
-Rà soát tên ứng viên giao dịch/xác minh theo regex **{TRANSACTION_PATTERN}**, trước khi xem liên hệ với nhãn; khớp token phân cách bởi dấu gạch dưới và giữ đầy đủ action_type để đối chiếu. Nhóm confirm/request có thể liên quan xác minh tài khoản hoặc yêu cầu, chưa mặc định là booking hoàn tất. Đếm presence theo user sau khi gộp toàn bộ chunk, tránh một người bị đếm lặp vì nhiều sự kiện. Mẫu số của hai cột pct_booked/pct_ndf là người có sessions trong từng lớp, không phải toàn bộ train.
+Để rà soát rủi ro rò rỉ, phân tích chọn tên hành động liên quan giao dịch hoặc xác minh bằng biểu thức **{TRANSACTION_PATTERN}**. Quy tắc tên được đặt trước khi xem liên hệ với nhãn y và khớp các thành phần tên phân cách bằng dấu gạch dưới. Bảng giữ đầy đủ action_type để đối chiếu. Mỗi người chỉ được đếm một lần cho mỗi tên hành động sau khi gộp toàn bộ dữ liệu.
 
-**Dấu hiệu đáng điều tra:** receipt có {int(receipt.booked_users):,}/{int(receipt.users_with_action):,} user mang nhãn booked ({receipt.booking_rate_pct:.2f}%); requested có {int(requested.booked_users):,}/{int(requested.users_with_action):,} ({requested.booking_rate_pct:.2f}%). Tỷ lệ cao phù hợp với rủi ro log chứa bước sát hoặc sau kết quả, chưa chứng minh receipt luôn là hậu booking hoặc requested gây ra booking.
+**Kết quả rà soát:** trong những người có hành động receipt, {int(receipt.booked_users):,}/{int(receipt.users_with_action):,} người có nhãn y=1 ({receipt.booking_rate_pct:.2f}%). Với requested, con số tương ứng là {int(requested.booked_users):,}/{int(requested.users_with_action):,} ({requested.booking_rate_pct:.2f}%). Các tỷ lệ cao cho thấy cần xác minh liệu nhật ký có chứa bước gần hoặc sau thời điểm đặt chỗ. Tên hành động có thể bao gồm yêu cầu thất bại, xác minh tài khoản hoặc chuẩn bị thanh toán, nên cần dữ liệu thời gian và mô tả nghiệp vụ để xác định ý nghĩa.
 
-Tên như booking/payment/request là dấu hiệu cần điều tra. Hành động cũng có thể là yêu cầu thất bại, chuẩn bị thanh toán hoặc hoạt động sau booking; xuất hiện ở booked hay NDF chưa chứng minh thứ tự trước/sau kết quả. **Toàn bộ sessions bị loại khỏi phạm vi đầu vào của thiết kế chính tại signup**, cho tới khi có timestamp hoặc chứng cứ về cửa sổ log. Đây là quyết định phạm vi đề xuất, chưa tạo tập feature.
+Hai cột pct_booked_users_with_action và pct_ndf_users_with_action có mẫu số là số người có sessions trong từng nhóm y=1 và y=0. Cột booking_rate_pct có mẫu số là số người có hành động đó. Các cột trả lời hai câu hỏi khác nhau: hành động phổ biến đến đâu trong mỗi nhóm nhãn, và tỷ lệ đặt chỗ của người có hành động là bao nhiêu.
 """, [("Độ phủ năm account train", next(t for name, t in next(b for b in base["multivariate_main"]["blocks"] if b["key"] == "sessions")["tables"] if "năm account" in name)),
       ("Booking trong nhóm có/không sessions — chỉ cohort 2014", s2014),
       ("Số sự kiện/user theo có log và nhãn — chỉ cohort 2014", event_summary),
       ("Presence tên ứng viên giao dịch/xác minh × nhãn, trong user 2014 có log", trans_display)],
       [report.directory/"figures/session_coverage.png"])
-    fig_note(report, report.directory/"figures/session_coverage.png", f"Nhận xét: độ phủ train toàn kỳ 34,58% là hỗn hợp cohort; train 2014 đạt {coverage_recent:.2f}% so với test 2014 {coverage_test:.2f}%, chênh {coverage_test-coverage_recent:.2f} điểm phần trăm. Không có log ở cohort 2010–2013. Độ phủ cao không chứng minh log được ghi trước thời điểm dự đoán.")
+    fig_note(report, report.directory/"figures/session_coverage.png", f"Nhận xét: độ phủ sessions trên toàn bộ train là 34,58%. Khi giới hạn ở nhóm đăng ký năm 2014, độ phủ train đạt {coverage_recent:.2f}%, gần hơn với mức {coverage_test:.2f}% của test. Khoảng cách còn {coverage_test-coverage_recent:.2f} điểm phần trăm. Nhóm đăng ký năm 2010–2013 không có nhật ký, nên tỷ lệ toàn kỳ chịu ảnh hưởng lớn của phạm vi thu thập.")
 
     # Calendar table appears once in the body; monthly detail only in appendix.
     old_time = next(b for b in base["multivariate_main"]["blocks"] if b["key"] == "time")
@@ -429,26 +438,28 @@ Tên như booking/payment/request là dấu hiệu cần điều tra. Hành đ�
         on="column", validate="one_to_one")
     monthly = next(t for name, t in next(b for b in appendix if b["key"] == "calendar_tables")["tables"] if "Cohort theo tháng" in name)
     time_section = section("time", "Cohort tháng có bất định và drift train–test", """
-Train có account 2010-01–2014-06; test 2014-07–2014-09 và không có nhãn. Hình giữ từng tháng, thêm Wilson 95% và ranh giới 2014-01 khi bắt đầu có sessions. Tháng ít user có khoảng rộng hơn; đường lên/xuống chưa chứng minh chất lượng khách hoặc mùa vụ.
+Train gồm người tạo tài khoản từ tháng 1/2010 đến tháng 6/2014. Test nối tiếp từ tháng 7 đến tháng 9/2014. Hình biểu diễn tỷ lệ đặt chỗ theo từng tháng cùng khoảng Wilson 95%. Vạch tại tháng 1/2014 đánh dấu thời kỳ bắt đầu có sessions. Nhóm tháng ít người có khoảng tin cậy rộng hơn, nên dao động của tỷ lệ cần được đọc cùng cỡ mẫu.
 
-Total variation trong [0,1] chỉ so sánh phân phối từng biến. Hai cột toàn kỳ và chỉ train 2014 giúp thấy phần thay đổi do thành phần cohort; chưa loại được drift trong năm hoặc drift quan hệ với nhãn. Các bảng khoảng thời gian và drift xuất hiện duy nhất tại đây; phụ lục chỉ giữ số liệu cohort tháng.
+Total variation (TV) đo mức khác nhau giữa hai phân phối của một biến, từ 0 (giống nhau) đến 1 (không giao nhau). Cột tv_all_train_vs_test so sánh toàn bộ train với test. Cột tv_train2014_vs_test giới hạn train ở năm 2014. Nếu TV giảm nhiều trong phép so sánh thứ hai, thành phần năm đăng ký là một yếu tố cần xem xét. Hai phép so sánh mô tả sự thay đổi phân phối đầu vào. Kiểm định mô hình theo thời gian ở phần 7 sẽ đánh giá khả năng dự báo khi dữ liệu thay đổi.
 """, [("Khoảng thời gian account", old_time["tables"][0][1]), ("Khác biệt category train–test: toàn kỳ và cùng năm 2014", drift)],
       [report.directory/"figures/account_cohorts.png"])
     smallest = monthly.loc[monthly.users.idxmin()]
-    fig_note(report, report.directory/"figures/account_cohorts.png", f"Nhận xét: tháng {smallest.account_month} chỉ có {int(smallest.users)} user, booking rate {smallest.booked_pct:.2f}% với Wilson 95% [{smallest.ci95_low_pct:.2f}%; {smallest.ci95_high_pct:.2f}%]; vì vậy dao động ở cohort nhỏ cần đọc cùng bất định. Vạch đứt 2014-01 đánh dấu thay đổi độ phủ sessions, không phải bằng chứng về tác động riêng của thời gian đăng ký.")
+    fig_note(report, report.directory/"figures/account_cohorts.png", f"Nhận xét: nhóm đăng ký tháng {smallest.account_month} chỉ có {int(smallest.users)} người. Tỷ lệ đặt chỗ là {smallest.booked_pct:.2f}% với khoảng Wilson 95% từ {smallest.ci95_low_pct:.2f}% đến {smallest.ci95_high_pct:.2f}%. Vì cỡ mẫu nhỏ, ước lượng của tháng này có độ bất định lớn. Vạch đứt tháng 1/2014 đánh dấu thời kỳ bắt đầu có sessions.")
 
     # A concrete research target, with a separately blocked deployment horizon.
     problem = section("problem", "1. Bài toán và lý do chọn dữ liệu", f"""
-**Bối cảnh nghiệp vụ:** ưu tiên hỗ trợ onboarding/cá nhân hóa cho người dùng mới dựa trên khả năng phát sinh booking đầu. Điểm propensity mô tả xu hướng hành vi; chưa phải tác động tăng thêm do một chiến dịch.
+**Bối cảnh nghiệp vụ:** doanh nghiệp muốn ưu tiên hỗ trợ và cá nhân hóa trải nghiệm cho người dùng mới dựa trên khả năng họ phát sinh lượt đặt chỗ đầu tiên. Mỗi người dùng nhận một điểm xác suất để phục vụ việc sắp thứ tự ưu tiên.
 
-**Phát biểu bài toán nghiên cứu đã chọn:** với một user mới, sử dụng thông tin đăng ký sẵn có tại t0 để ước lượng xác suất có booking đầu được ghi nhận trong nhãn nguồn. Đầu ra là một xác suất [0,1] cho mỗi user, phục vụ sắp ưu tiên; bài toán điểm đến 12 lớp được giữ làm bối cảnh EDA.
+**Bài toán nghiên cứu:** ngay sau khi người dùng tạo tài khoản, mô hình dự kiến sử dụng thông tin đăng ký để ước lượng xác suất có lượt đặt chỗ đầu tiên được ghi nhận trong bộ dữ liệu. Đầu ra là xác suất trong [0,1] cho từng người dùng. Bài toán dự đoán điểm đến với 12 lớp được trình bày để giải thích nguồn dữ liệu.
 
-**t0 thiết kế:** ngay sau khi hoàn tất tạo tài khoản. date_account_created chỉ chính xác tới ngày nên không xác minh được thứ tự trong ngày. Nhãn nghiên cứu y=1 khi country_destination khác NDF; y=0 khi NDF, không diễn giải thành “không bao giờ book”. Các giá trị hồ sơ phải được xác minh là snapshot tại signup. {int(lag.lt(0).sum())} booking có ngày trước account chưa thỏa logic first-booking tương lai tại t0; đề xuất cách ly để xác minh ở giai đoạn sau, chưa xóa.
+**Thời điểm dự đoán t0:** báo cáo chọn thời điểm ngay sau khi hoàn tất tạo tài khoản. Vì date_account_created chỉ ghi ngày, dữ liệu hiện tại chỉ cho phép kiểm tra thứ tự giữa các ngày. Để dùng thông tin hồ sơ tại t0, cần xác minh mỗi giá trị phản ánh hồ sơ lúc đăng ký.
 
-**Horizon:** phạm vi hiện tại là kết quả được ghi nhận theo cơ chế nhãn nguồn, không tự đổi thành nhãn 90 ngày. Horizon nghiệp vụ đề xuất là 90 ngày vì bao phủ {coverage_at(90):.2f}% booking quan sát hợp lệ; muốn triển khai cần xác nhận ngày kết thúc theo dõi và nhãn âm. Nếu không xác minh được, chỉ được kết luận về bài toán nghiên cứu theo nhãn nguồn.
+**Nhãn y:** y=1 khi country_destination khác NDF và y=0 khi country_destination bằng NDF. Nhãn y thể hiện kết quả được ghi nhận trong bộ dữ liệu. Có {int(lag.lt(0).sum())} trường hợp ngày đặt chỗ trước ngày tạo tài khoản. Các trường hợp này cần được đánh dấu để xác minh trước khi quyết định đưa vào tập huấn luyện.
+
+**Thời hạn dự đoán:** bài toán hiện tại dùng nhãn y với thời gian theo dõi theo bộ dữ liệu. Phương án triển khai đề xuất thời hạn 90 ngày vì khoảng này bao phủ {coverage_at(90):.2f}% lượt đặt chỗ có độ trễ hợp lệ. Để xây dựng nhãn cho phương án đó, cần biết ngày kết thúc theo dõi của từng người dùng. Người không đặt chỗ chỉ được gán nhãn âm 90 ngày khi đã được theo dõi đủ khoảng thời gian này.
 """, [("Lý do chọn Airbnb so với hai bộ còn lại", pd.DataFrame([
         ["AIRBNB", "User mới", f"{len(train):,} user; {frame.observed_booking.mean()*100:.2f}% có booking", "Đúng đối tượng chấm propensity khách hàng; có ID", "Chọn cho nghiên cứu, còn điều kiện nhãn/t0"],
-        ["HOTEL", "Booking đã được tạo", "Nhãn hủy/no-show; không quan sát đầy đủ người chưa đặt", "Hợp cancellation propensity", "Không trả lời trực tiếp ai sẽ tạo booking đầu"],
+        ["HOTEL", "Booking đã được tạo", "Nhãn hủy/no-show; không quan sát đầy đủ người chưa đặt", "Hợp cancellation propensity", "Không trả lời trực tiếp ai sẽ tạo lượt đặt chỗ đầu tiên"],
         ["EXPEDIA", "Cặp search–hotel", "Tương tác trong danh sách; thiếu user ID và search không click", "Hợp ranking/propensity trong search", "Không ưu tiên cho propensity onboarding theo user"],
     ], columns=["dataset", "unit", "evidence", "fit", "decision"]))])
 
@@ -468,35 +479,37 @@ Total variation trong [0,1] chỉ so sánh phân phối từng biến. Hai cột
     ], columns=["criterion", "predeclared_acceptance", "interpretation"])
     research = combine("research_design", "7. Thuật toán và thiết kế đánh giá đề xuất", [
         section("algorithms", "Baseline, mô hình chính và xác suất", """
-Chọn nhị phân first-booking theo nhãn nguồn làm bài toán chính. Binary 41,65%/58,35% không cần mặc định resampling hoặc class weight; lớp điểm đến hiếm không phải lý do cân bằng lại nhãn nhị phân.
+Thiết kế chính dự đoán nhãn y ở cấp người dùng. Hai nhóm y=1 và y=0 chiếm lần lượt 41,65% và 58,35%, nên thí nghiệm đầu tiên sẽ giữ phân phối lớp hiện có. Việc một số điểm đến có ít quan sát được xử lý riêng trong bối cảnh bài toán 12 lớp.
 
-CatBoost là ứng viên chính để kiểm tra, không phải kết luận đã thắng baseline. Tín hiệu EDA và tương tác chỉ là cơ sở đặt giả thuyết. Mọi quy tắc xử lý tuổi, NA/category hiếm và mọi thống kê dựa nhãn phải học riêng trong train của mỗi fold. ID và date_first_booking không làm đầu vào; sessions chưa thuộc thiết kế chính.
+Các nhóm kết hợp có tỷ lệ đặt chỗ khác nhau trong EDA. Vì CatBoost có thể biểu diễn các quan hệ như vậy, báo cáo đề xuất so sánh mô hình này với xác suất hằng và Logistic Regression có điều chuẩn L2. Kết quả đánh giá sẽ quyết định mô hình nào phù hợp hơn.
+
+Mỗi lượt chia dữ liệu có một tập huấn luyện riêng. Các quy tắc xử lý tuổi, giá trị thiếu, nhóm hiếm và thống kê dựa trên nhãn phải được học trong tập này rồi mới áp dụng cho tập kiểm định. Danh sách đầu vào của thiết kế chính loại ID, date_first_booking và sessions theo các bằng chứng ở phần 3 và phần 5.
 
 Nguồn thuật toán: [xử lý category của CatBoost](https://catboost.ai/docs/en/concepts/algorithm-main-stages_cat-to-numberic). Hiệu chỉnh phải tách khỏi dữ liệu fit; [scikit-learn về calibration](https://scikit-learn.org/stable/modules/calibration.html) cũng lưu ý Brier/log loss đánh giá cả calibration lẫn khả năng phân biệt.
 """, [("Ứng viên và lý do chọn — chưa thực hiện", models)]),
         section("evaluation", "Chia theo thời gian và kiểm soát đánh giá", """
-Thiết kế dưới đây được đặt trước lần huấn luyện đầu tiên. Rolling validation dùng để chọn cấu hình; sau đó refit đến hết 2014-03, calibration trên 2014-04, đánh giá nội bộ cuối trên 2014-05–06. Mỗi user chỉ một dòng và một giai đoạn trong từng fold; các cửa sổ học tích lũy giữa fold là có chủ đích. Test Kaggle 2014-07–09 không có nhãn, chỉ dùng đối chiếu schema/drift.
+Thiết kế đánh giá được đề xuất trước lần huấn luyện đầu tiên. Kiểm định theo các cửa sổ thời gian liên tiếp dùng để chọn cấu hình. Sau đó, mô hình được huấn luyện lại với dữ liệu đến hết tháng 3/2014, được hiệu chỉnh xác suất bằng dữ liệu tháng 4/2014 và được đánh giá cuối trên tháng 5–6/2014. Trong mỗi lượt chia, mỗi người dùng chỉ xuất hiện ở một giai đoạn. Tập huấn luyện mở rộng dần giữa các lượt chia. Test Kaggle tháng 7–9/2014 dùng để đối chiếu cấu trúc cột và phân phối vì tập này không có nhãn.
 
-Bảng chỉ kiểm kê quy mô các cửa sổ đề xuất, chưa tạo tập chia hoặc fit. Việc chia theo signup đánh giá thay đổi cohort, chưa mô phỏng đầy đủ một backtest tại thời điểm lịch: cần chứng minh nhãn train đã được đóng và có sẵn trước mỗi mốc dự đoán. Nếu sau này dùng horizon 90 ngày, phải thêm điều kiện trưởng thành nhãn trước origin; chưa được lấy booking tương lai để giả lập huấn luyện tại quá khứ.
+Bảng dưới kiểm kê số người dùng trong từng cửa sổ dự kiến. Để mô phỏng việc huấn luyện tại một thời điểm trong quá khứ, chỉ được dùng những nhãn đã có sẵn trước thời điểm đó. Với thời hạn 90 ngày, người mang nhãn âm trong tập huấn luyện phải hoàn tất đủ 90 ngày theo dõi trước mốc bắt đầu dự đoán của lượt chia. Điều kiện này cần được kiểm tra sau khi bổ sung thông tin theo dõi.
 
-Chọn tham số/early stopping bằng validation; chọn phương pháp calibration bằng dữ liệu phát triển, fit calibrator trên tháng 4. Giữ tập cuối cho một lần đánh giá sau khi khóa thiết kế. Các khoảng bootstrap đề xuất phải lấy mẫu theo user, seed=42; chưa chạy bootstrap.
+Tập kiểm định dùng để chọn tham số và thời điểm dừng huấn luyện. Dữ liệu phát triển dùng để chọn phương pháp hiệu chỉnh xác suất, sau đó bộ hiệu chỉnh được học trên tháng 4/2014. Tập đánh giá cuối chỉ được sử dụng sau khi đã chốt thiết kế. Khoảng tin cậy dự kiến được tính bằng cách lấy mẫu lặp lại theo người dùng (bootstrap), với seed=42.
 """, [("Cửa sổ thời gian đề xuất và quy mô quan sát", proposed_protocol(train, account))]),
-        section("acceptance", "Tiêu chí chấp nhận đặt trước", "Các mức 2%, 10%, 1,20, 2/3 điểm phần trăm và ngân sách top 20% là quy ước nghiên cứu đề xuất, không phải chuẩn phổ quát hoặc cam kết hiệu quả kinh doanh. Khi có chi phí/lợi ích thực tế cần chốt lại trước huấn luyện và ghi phiên bản protocol. Tất cả trạng thái hiện tại là chưa đánh giá.", [("Cổng chấp nhận cho giai đoạn mô hình hóa", criteria)]),
+        section("acceptance", "Tiêu chí chấp nhận đặt trước", "Bảng dưới đề xuất các mức cải thiện xác suất, khả năng xếp hạng và độ ổn định theo thời gian. Các ngưỡng 2%, 10%, 1,20, sai lệch 2 hoặc 3 điểm phần trăm và tỷ lệ ưu tiên 20% là quy ước cho thí nghiệm nghiên cứu. Khi có thông tin chi phí và lợi ích thực tế, cần chốt lại các mức này và ghi phiên bản thiết kế trước khi huấn luyện. Trạng thái hiện tại của các tiêu chí là chưa đánh giá.", [("Điều kiện để chấp nhận kết quả mô hình", criteria)]),
     ])
 
     suitability = pd.DataFrame([
         ["Đủ tín hiệu", f"10 category được sàng lọc V; gender V={v_by_name.loc['gender','effect_all']:.3f}, trong 2014={v_by_name.loc['gender','effect_2014']:.3f}; có bảng tương tác/cohort", "Đạt ở mức EDA", "Chưa chứng minh dự báo ngoài mẫu; không dùng p-value thay AUC"],
         ["Đủ cỡ mẫu", f"{len(train):,} users; {int(frame.observed_booking.sum()):,} booking; cohort 2014 {recent_users:,}", "Đạt tổng thể", "Một số category/ô tương tác ít user; dùng n và CI"],
-        ["Nhãn tin cậy", f"Presence ngày booking khớp 100%; {int(lag.lt(0).sum())} độ trễ âm; max độ trễ 365 ngày", "Cần xác minh", "Chưa xác nhận horizon/follow-up của NDF và ngoại lệ trước account"],
+        ["Nhãn tin cậy", f"Việc có ngày đặt chỗ khớp nhãn y ở 100% trường hợp. Có {int(lag.lt(0).sum())} độ trễ âm và độ trễ tối đa 365 ngày.", "Cần xác minh", "Cần ngày kết thúc theo dõi của người có y=0 và giải thích ngoại lệ trước ngày tạo tài khoản."],
         ["Không rò rỉ", "date_first_booking và presence tiết lộ nhãn; sessions chứa tên giao dịch, thiếu timestamp", "Chưa đạt với toàn bộ raw", "Thiết kế chính loại các nguồn này; cần audit lại trước fit"],
         ["Biến khả dụng tại t0", "t0 đã chọn: sau tạo account; raw không cung cấp lịch sử cập nhật hồ sơ", "Cần xác minh", "Xác nhận snapshot từng biến; ngày account không có giờ"],
         ["Ổn định theo thời gian", "Booking rate/cohort, độ phủ sessions và TV category thay đổi; đã có đối chiếu cùng năm 2014", "Chưa đạt giả định ổn định", "Dùng kiểm định theo thời gian, không coi train/test là IID"],
         ["Khái quát hóa", "User từ Mỹ, giai đoạn lịch sử; test Kaggle không có nhãn; chưa có dữ liệu vận hành khác", "Chưa được chứng minh", "Chưa suy sang Việt Nam, thị trường hiện tại hoặc chiến dịch marketing"],
     ], columns=["criterion", "evidence_in_report", "status", "remaining_condition"])
     conclusion = section("conclusion_main", "8. Bằng chứng về mức độ phù hợp", """
-**Kết luận lựa chọn:** Airbnb phù hợp nhất trong ba bộ cho nghiên cứu propensity booking đầu ở cấp user. Có cỡ mẫu và liên hệ mô tả để tiếp tục thiết kế nghiên cứu. Chưa đủ bằng chứng xác nhận một mô hình triển khai tại signup với horizon 90 ngày.
+**Kết luận lựa chọn:** trong ba bộ dữ liệu, Airbnb phù hợp nhất để nghiên cứu xác suất có lượt đặt chỗ đầu tiên ở cấp người dùng. Cỡ mẫu và các liên hệ quan sát được là cơ sở để tiến hành thí nghiệm mô hình sau khi xử lý các điều kiện dữ liệu trong bảng dưới.
 
-Các điều kiện về t0, ngoại lệ nhãn và thời gian theo dõi là cổng dữ liệu cần giải quyết; không được biến thành giả định ngầm để đánh dấu mọi tiêu chí đều đạt. Chưa làm sạch, thay thế tuổi/NA, mã hóa, tạo feature, tạo tập chia hay huấn luyện mô hình. Các nhóm, cờ và tổng sessions chỉ dùng để tính bảng EDA trong bộ nhớ.
+Ba việc cần hoàn tất là xác minh thông tin hồ sơ tại t0, làm rõ các ngoại lệ ngày đặt chỗ và xác nhận thời gian theo dõi của từng người dùng. Chúng quyết định khả năng sử dụng dữ liệu cho phương án dự đoán trong 90 ngày. Bảng dưới phân biệt tiêu chí đã có bằng chứng với điều kiện còn cần giải quyết.
 """, [("Bảng kiểm mức độ phù hợp", suitability)])
 
     # Remove body/appendix duplicates, retain only additional evidence.
@@ -511,7 +524,7 @@ Các điều kiện về t0, ngoại lệ nhãn và thời gian theo dõi là c�
             block["tables"][0] = (block["tables"][0][0], table)
     appendix.extend([
         section("extra_rates", "Tỷ lệ nhãn cho nhóm bổ sung", "Các bảng ở đây không lặp các nhóm đã công bố trong phần chính.", extra_tables),
-        section("strata_details", "Phân tầng và tương tác: Wilson 95% cho từng ô", "Dùng để đọc độ bất định của các ô heatmap; không phải kết quả mô hình.", [(f"{c} × năm", t) for c, t in strata.items()] + interaction_tables),
+        section("strata_details", "Phân tầng và các nhóm kết hợp: Wilson 95% cho từng ô", "Các bảng cung cấp cỡ mẫu, tỷ lệ đặt chỗ và khoảng tin cậy cho từng ô trên bản đồ nhiệt.", [(f"{c} × năm", t) for c, t in strata.items()] + interaction_tables),
         section("session_action_details", "Rà soát sessions bổ sung", "Mẫu số là user 2014 có log; action_type giữ toàn bộ, action_detail lọc bằng regex đã công bố. Các bảng không chứng minh thời điểm sự kiện.", [("Toàn bộ action_type và action_detail được rà soát", actions[~actions.field.eq("action")].drop(columns=["transaction_name_match"]))]),
         section("monthly_cohorts", "Cohort theo tháng và khoảng tin cậy", "Số liệu đứng sau hình account_cohorts; không lặp lại bảng khoảng thời gian hoặc drift.", [("Toàn bộ cohort tháng; Wilson 95%", monthly)]),
     ])
@@ -529,12 +542,11 @@ Các điều kiện về t0, ngoại lệ nhãn và thời gian theo dõi là c�
             "max_observed_lag_days": observed_lag.max(),
         })
     appendix.append(section("recent_lag_cohorts", "Độ trễ trong các cohort tháng gần cuối train",
-        "So 2014-01 đến 2014-06 để xem khác biệt trong các booking đã quan sát. Không gán thời gian theo dõi cho NDF từ phân phối dương; tỷ lệ trong ba cột horizon có mẫu số valid_observed_bookings.",
+        "Bảng so sánh các nhóm đăng ký từ tháng 1 đến tháng 6/2014. Các tỷ lệ trong ba cột within30/60/90 có mẫu số valid_observed_bookings, tức số lượt đặt chỗ có độ trễ hợp lệ của nhóm. Thời gian theo dõi của người có y=0 cần được xác định riêng.",
         [("Cohort 2014: NDF và mức bao phủ booking quan sát",pd.DataFrame(recent_lags))]))
     source = base["overview"]["blocks"][0]
     source["tables"][0][1].loc[source["tables"][0][1]["item"].eq("Ngày tải raw"), "description"] = "Không được lưu; người cung cấp xác nhận 2026-11-02. Mã phiên bản Kaggle chưa có bằng chứng; dùng snapshot SHA-256."
     scope = base["overview"]["blocks"][1]
-    scope["text"] = scope["text"].replace("Chưa xác minh được ngày kết thúc theo dõi cho từng người dùng và độ trưởng thành nhãn ở mỗi cohort.", "Phân tích độ trễ và độ nhạy horizon ở phần 5 phân biệt nhãn nguồn với nhãn triển khai theo thời hạn.")
     overview = combine("overview", "2. Tổng quan bộ dữ liệu", [source, scope])
     base["quality_main"]["title"] = "3. Chất lượng dữ liệu"
     base["univariate"]["title"] = "4. Phân tích đơn biến"
@@ -544,19 +556,48 @@ Các điều kiện về t0, ngoại lệ nhãn và thời gian theo dõi là c�
     cov_absent = s2014.set_index("has_sessions")
     age_signal = v_by_name.loc["age: cờ thiếu (EDA)"]
     age_rank = v_by_name.loc["age: chỉ cửa sổ 16–100 (EDA)"]
-    insights = [
-        f"**Bài toán đã chọn:** xác suất user mới có booking đầu được ghi nhận, t0 thiết kế ngay sau tạo account; {len(train):,} user train và {len(test):,} test. Horizon nguồn chưa được xác nhận; xem phần 1.",
-        f"**Nhãn và độ trễ:** {int(frame.observed_booking.sum()):,} user có booking ({frame.observed_booking.mean()*100:.2f}%); trong {len(values):,} độ trễ không âm, 30/60/90 ngày bao phủ {coverage_at(30):.2f}%/{coverage_at(60):.2f}%/{coverage_at(90):.2f}%. Xem bảng độ trễ phần 5.",
-        f"**Ngoại lệ nhãn:** {int(lag.lt(0).sum())} booking trước ngày account; max độ trễ ở mọi năm là 365 ngày. Đây là căn cứ điều tra cơ chế nhãn, chưa chứng minh NDF đã được theo dõi đủ một năm.",
-        "**Leakage đã chứng minh:** presence date_first_booking khớp 100% nhãn; giữ bảng chéo tại phần 3. Cột này và cờ thiếu không là đầu vào dự đoán.",
-        f"**Liên hệ có định lượng:** gender có V={v_by_name.loc['gender','effect_all']:.3f} toàn kỳ và {v_by_name.loc['gender','effect_2014']:.3f} trong 2014; signup_app tương ứng {v_by_name.loc['signup_app','effect_all']:.3f}/{v_by_name.loc['signup_app','effect_2014']:.3f}. Bảng đủ biến và phân tầng ở phần 5, chưa là chất lượng mô hình.",
-        f"**So sessions cùng điều kiện:** train 2014 {coverage_recent:.2f}% so với test 2014 {coverage_test:.2f}%, chênh {coverage_test-coverage_recent:.2f} điểm phần trăm. {recent_users:,} user train nằm trong phạm vi cohort có log; xem phần sessions.",
-        f"**Có log không đồng nghĩa nhãn giống nhau:** trong 2014, booking rate có log {cov_absent.loc[True,'rate_pct']:.2f}%, không log {cov_absent.loc[False,'rate_pct']:.2f}%. Cần đọc cùng n/Wilson; không dùng presence log làm tín hiệu tại signup khi chưa chứng minh t0.",
-        f"**Missing và tuổi:** age thiếu {train.age.isna().mean()*100:.2f}%; trong 2014, cờ thiếu tuổi có V={age_signal.effect_2014:.3f}, còn rank-biserial của tuổi 16–100 là {age_rank.effect_2014:.3f}. Hai thước đo khác nhau; kết quả nhấn mạnh cần kiểm tra tính đầy đủ hồ sơ và snapshot tại t0. Giữ riêng NA, unknown và untracked.",
-        "**Thiết kế tiếp theo đã cụ thể hóa:** baseline hằng/Logistic L2, CatBoost và calibration; rolling theo signup, calibration tháng 4/2014, đánh giá cuối tháng 5–6/2014. Đây là protocol đề xuất, chưa chia tập hay train.",
+    glossary = section("glossary", "Thuật ngữ và cách đọc báo cáo", """
+Mọi số liệu trong báo cáo là thống kê mô tả từ dữ liệu gốc. Chúng cho biết các liên hệ trong mẫu, chưa phải kết quả dự báo hoặc bằng chứng về tác động nhân quả. Báo cáo dừng ở EDA và thiết kế thí nghiệm, chưa xử lý dữ liệu cho mô hình hoặc huấn luyện mô hình.
+
+Báo cáo dùng thống nhất “nhãn y” cho mục tiêu nhị phân và “lượt đặt chỗ đầu tiên” cho hành vi cần dự đoán. Tên cột và mã giá trị được giữ nguyên để đối chiếu với dữ liệu.
+""", [("Các thuật ngữ dùng trong báo cáo", pd.DataFrame([
+        ["EDA", "Phân tích khám phá dữ liệu bằng bảng, biểu đồ và thống kê mô tả."],
+        ["NDF", "Mã No Destination Found trong country_destination, nghĩa là bộ dữ liệu không ghi nhận lượt đặt chỗ. Mã này không có nghĩa người dùng sẽ không bao giờ đặt chỗ."],
+        ["Nhãn y", "Mục tiêu nhị phân: y=1 nếu country_destination khác NDF, y=0 nếu bằng NDF. Cột country_destination giữ nguyên 12 giá trị điểm đến gốc."],
+        ["Lượt đặt chỗ đầu tiên", "Lượt đặt chỗ đầu tiên được ghi nhận trong bộ dữ liệu (first booking)."],
+        ["t0", "Thời điểm dự đoán, được chọn là ngay sau khi người dùng hoàn tất tạo tài khoản."],
+        ["Thời hạn dự đoán (horizon)", "Khoảng thời gian tính từ t0 để xét hành vi, chẳng hạn 90 ngày. Thời gian theo dõi thực tế của nhãn y hiện có còn cần xác minh."],
+        ["Nhóm đăng ký (cohort)", "Những người tạo tài khoản trong cùng một khoảng thời gian, thường là một tháng hoặc một năm."],
+        ["Rò rỉ thông tin (leakage)", "Việc dùng thông tin tiết lộ kết quả hoặc chưa có sẵn tại t0 làm đầu vào dự đoán."],
+        ["Cramér V", "Thước đo độ mạnh liên hệ giữa hai biến phân loại, từ 0 (không liên hệ) đến 1 (liên hệ hoàn toàn)."],
+        ["Rank-biserial", "Thước đo chênh lệch thứ hạng giữa hai nhóm, từ −1 đến 1. Với tuổi, dấu dương nghĩa nhóm y=1 có xu hướng lớn tuổi hơn. Giá trị gần 0 nghĩa khác biệt rất nhỏ."],
+        ["Khoảng Wilson 95%", "Khoảng tin cậy cho tỷ lệ trong một nhóm. Khoảng rộng cho biết ước lượng còn kém chính xác, thường do nhóm ít người."],
+        ["Sessions", "Nhật ký hoạt động trên web hoặc ứng dụng. Mỗi người dùng có thể có nhiều sự kiện."],
+        ["Train / test", "Tập có nhãn dùng cho nghiên cứu / tập Kaggle không có nhãn, dùng đối chiếu cấu trúc và phân phối."],
+        ["NA / unknown / untracked", "Giá trị bị thiếu / mã không rõ thông tin / mã không theo dõi được. Báo cáo giữ riêng ba trường hợp."],
+        ["Mốc bắt đầu dự đoán (origin)", "Thời điểm lịch bắt đầu một lượt đánh giá. Dữ liệu dùng huấn luyện phải có sẵn trước mốc này."],
+    ], columns=["Thuật ngữ", "Giải nghĩa"]))])
+    findings = [
+        f"**Quy mô và nhãn y:** tập train có {len(train):,} người dùng, trong đó {int(frame.observed_booking.sum()):,} người có lượt đặt chỗ đầu tiên ({frame.observed_booking.mean()*100:.2f}%). Tập test có {len(test):,} người dùng. Hai nhóm nhãn y có quy mô đủ lớn để bắt đầu thí nghiệm với phân phối lớp hiện có.",
+        f"**Thời gian phát sinh đặt chỗ:** trong {len(values):,} lượt đặt chỗ có độ trễ không âm, {coverage_at(30):.2f}% xảy ra trong 30 ngày, {coverage_at(60):.2f}% trong 60 ngày và {coverage_at(90):.2f}% trong 90 ngày. Vì phần lớn lượt đặt chỗ tập trung trong ba tháng đầu, 90 ngày là thời hạn đáng xem xét cho phương án triển khai.",
+        f"**Liên hệ của hồ sơ đăng ký:** gender có V={v_by_name.loc['gender','effect_all']:.3f} trên toàn kỳ và {v_by_name.loc['gender','effect_2014']:.3f} trong năm 2014, được diễn giải ở mức yếu đến vừa trong báo cáo. signup_app có liên hệ yếu hơn, với V lần lượt là {v_by_name.loc['signup_app','effect_all']:.3f} và {v_by_name.loc['signup_app','effect_2014']:.3f}. Hai biến này là ứng viên để kiểm tra giá trị bổ sung trong mô hình.",
+        f"**Độ đầy đủ của hồ sơ tuổi:** age thiếu ở {train.age.isna().mean()*100:.2f}% người dùng. Trong năm 2014, cờ thiếu tuổi có V={age_signal.effect_2014:.3f}, còn tuổi trong dải 16–100 có rank-biserial={age_rank.effect_2014:.3f}, gần 0. Mức độ đầy đủ của hồ sơ có liên hệ đáng chú ý với nhãn y, trong khi khác biệt thứ hạng tuổi giữa hai nhóm rất nhỏ.",
+        f"**Phạm vi nhật ký hoạt động:** trong năm 2014, {coverage_recent:.2f}% người dùng train và {coverage_test:.2f}% người dùng test có sessions, chênh {coverage_test-coverage_recent:.2f} điểm phần trăm. Tỷ lệ có đặt chỗ trong nhóm có nhật ký là {cov_absent.loc[True,'rate_pct']:.2f}%, so với {cov_absent.loc[False,'rate_pct']:.2f}% ở nhóm thiếu nhật ký. Vì dữ liệu trước năm 2014 không có sessions, nghiên cứu riêng nguồn này cần tập trung vào {recent_users:,} người dùng train đăng ký năm 2014.",
     ]
+    next_steps = [
+        f"**Xác minh nhãn và thời gian theo dõi.** Làm rõ {int(lag.lt(0).sum())} trường hợp có ngày đặt chỗ trước ngày tạo tài khoản và lý do độ trễ lớn nhất quan sát được là 365 ngày. Bổ sung ngày kết thúc theo dõi của từng người dùng để có thể xây dựng nhãn âm cho thời hạn 90 ngày.",
+        "**Chốt thông tin có sẵn tại t0.** Xác nhận hồ sơ phản ánh thời điểm đăng ký. Loại date_first_booking và cờ thiếu của cột này khỏi đầu vào vì chúng khớp nhãn y ở 100% trường hợp. Thiết kế chính cũng loại sessions vì nhật ký thiếu thời điểm sự kiện để xác định phần có trước t0.",
+        "**Chốt thí nghiệm và tiêu chí đánh giá.** So sánh xác suất hằng, Logistic Regression có điều chuẩn L2 và CatBoost bằng các lượt chia theo thời gian. Dành tháng 4/2014 để hiệu chỉnh xác suất và tháng 5–6/2014 để đánh giá cuối. Trước khi huấn luyện, xác nhận nhãn dùng học đã có sẵn tại mốc bắt đầu dự đoán của mỗi lượt chia.",
+    ]
+    executive_text = (
+        "**Kết luận:** Airbnb phù hợp nhất trong ba bộ dữ liệu để nghiên cứu xác suất người dùng mới có lượt đặt chỗ đầu tiên. Báo cáo chọn thời điểm dự đoán ngay sau khi tạo tài khoản và đề xuất bắt đầu thí nghiệm mô hình sau khi hoàn tất ba việc dưới đây."
+        + "\n\n**Năm phát hiện chính**\n\n"
+        + "\n\n".join(f"{i}. {text}" for i, text in enumerate(findings, 1))
+        + "\n\n**Ba việc cần giải quyết trước khi huấn luyện**\n\n"
+        + "\n\n".join(f"{i}. {text}" for i, text in enumerate(next_steps, 1))
+    )
     report.sections = [
-        section("executive", "Tóm tắt điều hành", "\n\n".join(f"{i}. {text}" for i, text in enumerate(insights, 1))),
+        glossary, section("executive", "Tóm tắt điều hành", executive_text),
         problem, overview, base["quality_main"], base["univariate"],
         combine("multivariate_main", "5. Nhãn, liên hệ đa biến, cohort và sessions",
                 [delay_section, signal_section, target_section, strata_section, interaction_section, session_section, time_section]),
@@ -580,5 +621,5 @@ Các điều kiện về t0, ngoại lệ nhãn và thời gian theo dõi là c�
         "primary_target": "observed_first_booking_in_source_labels_not_fixed_horizon",
         "proposed_deployment_horizon_days": 90,
         "fixed_horizon_negative_followup_verified": False,
-        "analysis_revision": "airbnb_label_signal_cohort_sessions_protocol_v2",
+        "analysis_revision": "airbnb_readability_and_terminology_v3",
     })

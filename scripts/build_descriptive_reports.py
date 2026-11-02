@@ -379,7 +379,7 @@ AIRBNB_MEANINGS = {
     "id": ("Định danh người dùng", "Khóa ghép sessions.user_id; không phải phép đo"),
     "date_account_created": ("Ngày tạo tài khoản", "Mốc cohort; không tự xác định horizon nhãn"),
     "timestamp_first_active": ("Lần hoạt động đầu, dạng YYYYMMDDHHMMSS", "Có thể trước ngày tạo tài khoản; cần parse theo định dạng"),
-    "date_first_booking": ("Ngày booking đầu được ghi nhận", "Kết quả; presence tiết lộ nhãn có booking"),
+    "date_first_booking": ("Ngày của lượt đặt chỗ đầu tiên", "Kết quả. Việc có giá trị hay bị thiếu tiết lộ nhãn y."),
     "gender": ("Giới tính khai báo", "-unknown- là sentinel, không phải giá trị biết rõ"),
     "age": ("Tuổi khai báo", "Thiếu và giá trị ngoài dải tham chiếu; chưa sửa tuổi/năm sinh"),
     "signup_method": ("Phương thức đăng ký", "Biến phân loại"),
@@ -391,13 +391,13 @@ AIRBNB_MEANINGS = {
     "signup_app": ("Ứng dụng đăng ký", "Không đại diện mọi thiết bị dùng về sau"),
     "first_device_type": ("Thiết bị đầu tiên", "Khác device_type ở từng sự kiện sessions"),
     "first_browser": ("Trình duyệt đầu tiên", "Có sentinel -unknown-"),
-    "country_destination": ("Điểm đến booking đầu hoặc NDF", "Target 12 lớp; 11 lớp khi chỉ xét có booking"),
+    "country_destination": ("Điểm đến của lượt đặt chỗ đầu tiên hoặc NDF", "Cột điểm đến có 12 giá trị, được dùng để định nghĩa nhãn y."),
 }
 
 
 def airbnb_report(root):
     from scripts.airbnb_deep_dive import session_action_counts
-    r = Report("AIRBNB", "AIRBNB — Hiểu người dùng mới, booking đầu và độ phủ hành vi", root)
+    r = Report("AIRBNB", "AIRBNB — Hiểu người dùng mới, lượt đặt chỗ đầu tiên và độ phủ hành vi", root)
     folder = root/"data/raw/AIRBNB"
     train = pd.read_csv(folder/"train_users_2.csv")
     test = pd.read_csv(folder/"test_users.csv")
@@ -409,9 +409,9 @@ def airbnb_report(root):
     # Diagnostic label only, never exported as a modeling dataset.
     diagnostic = train.assign(observed_booking=booked.astype(int))
     r.add("scope", "1. Bối cảnh, đơn vị quan sát và phạm vi nhãn", f"""
-Train gồm **{count(n)} người dùng, 16 cột**, test gồm **{count(len(test))} người dùng, 15 cột**. Nhãn gốc là `country_destination` với 12 giá trị, gồm `NDF` và 11 điểm đến/nhóm điểm đến còn lại. Đối với propensity nhị phân, báo cáo chỉ thống kê hành vi **có booking được ghi nhận** khi nhãn khác NDF; không tạo tập nhãn huấn luyện mới.
+Train gồm **{count(n)} người dùng, 16 cột**, test gồm **{count(len(test))} người dùng, 15 cột**. Cột `country_destination` có 12 giá trị, gồm `NDF` và 11 điểm đến hoặc nhóm điểm đến. Báo cáo định nghĩa nhãn y từ cột này để phân tích khả năng có lượt đặt chỗ đầu tiên ở cấp người dùng.
 
-Mục tiêu gốc là dự đoán điểm đến booking đầu, không trực tiếp cung cấp nhãn booking trong 30/60/90 ngày. `NDF` nghĩa không có booking theo nhãn của bộ dữ liệu; không khẳng định người dùng sẽ không bao giờ book. Chưa xác minh được ngày kết thúc theo dõi cho từng người dùng và độ trưởng thành nhãn ở mỗi cohort.
+Mục tiêu gốc của bộ dữ liệu là dự đoán điểm đến của lượt đặt chỗ đầu tiên. Nhãn y kế thừa phạm vi theo dõi của bộ dữ liệu. Phần 5 phân tích độ trễ và thông tin cần bổ sung để xây dựng nhãn cho thời hạn 30, 60 hoặc 90 ngày.
 
 [Mô tả cuộc thi Airbnb New User Bookings](https://www.kaggle.com/c/airbnb-recruiting-new-user-bookings/data) nêu người dùng trong tập đến từ Mỹ. Vì vậy tính đại diện về địa lý, thời kỳ và sản phẩm có giới hạn. Test công khai không có nhãn để tính chất lượng dự đoán hoặc so sánh booking rate với train.
 """, [("Danh mục đầy đủ; submission chỉ là định dạng kết quả, không phải dữ liệu người dùng bổ sung", inventory)])
@@ -428,7 +428,7 @@ Mục tiêu gốc là dự đoán điểm đến booking đầu, không trực t
         ["date_first_booking.notna không khớp nhãn có booking", int((~matching).sum())],
         ["date_first_booking có giá trị trong test", int(test.date_first_booking.notna().sum())],
         ["Tuổi có giá trị nhưng ngoài [16,100] (quy ước mô tả)", int(invalid_age.sum())],
-        ["Booking đầu trước ngày tạo tài khoản", int((booking<account).sum())],
+        ["Lượt đặt chỗ đầu tiên trước ngày tạo tài khoản", int((booking<account).sum())],
         ["Hoạt động đầu trước ngày tạo tài khoản", int((first.dt.normalize()<account).sum())],
         ["Ngày account không parse được", int(account.isna().sum())],
         ["Timestamp hoạt động đầu không parse được", int(first.isna().sum())],
@@ -438,11 +438,11 @@ Mục tiêu gốc là dự đoán điểm đến booking đầu, không trực t
                              int(train[c].eq("untracked").sum())] for c in ["gender", "first_browser", "first_affiliate_tracked"]],
                             columns=["column", "null_n", "minus_unknown_n", "untracked_n"])
     r.add("quality", "3. Chất lượng users, sentinel và rò rỉ nhãn", f"""
-**Rò rỉ đã kiểm chứng:** presence của `date_first_booking` khớp nhãn có booking ở **{pct(matching.mean())}** người dùng train. Không dùng ngày này, hoặc cờ thiếu ngày này, làm đầu vào dự đoán booking đầu. Đây là thiếu theo cấu trúc kết quả, không phải missing cần impute.
+**Rò rỉ đã kiểm chứng:** việc `date_first_booking` có giá trị hay bị thiếu khớp nhãn y ở **{pct(matching.mean())}** người dùng train. Vì cột này tiết lộ kết quả cần dự đoán, thiết kế đầu vào loại cả ngày đặt chỗ và cờ thiếu ngày đặt chỗ. Giá trị thiếu ở đây phản ánh cách ghi nhận kết quả nên không cần điền ngày thay thế.
 
-Tuổi ngoài [16,100] được gắn cờ cho EDA; đây là **dải tham chiếu**, không phải chính sách hợp lệ đã xác nhận. Giá trị dạng 19xx/20xx có thể là năm sinh nhưng CSV không chứng minh nguyên nhân của từng dòng; không đổi tuổi, xóa người dùng hay thay giá trị. Gender/browser có sentinel cần thống kê riêng với NA.
+Tuổi ngoài [16,100] được thống kê riêng theo một **dải tham chiếu dùng cho EDA**. Các giá trị dạng 19xx/20xx gợi ý khả năng người dùng đã nhập năm sinh. Cần xác minh cách thu thập trước khi quyết định chuyển đổi hoặc thay thế tuổi. Các mã đặc biệt trong gender và browser được thống kê riêng với giá trị thiếu NA.
 
-Ngày hoạt động đầu trước ngày tạo tài khoản được nguồn gốc cho phép vì có thể tìm kiếm trước khi đăng ký. Có **{count((booking<account).sum())}** dòng ngày booking trước ngày account; đây là câu hỏi về định nghĩa mốc thời gian cần xác minh, không tự động kết luận lỗi rồi loại bỏ.
+Người dùng có thể tìm kiếm trước khi đăng ký, nên ngày hoạt động đầu có thể sớm hơn ngày tạo tài khoản. Có **{count((booking<account).sum())}** dòng ghi ngày đặt chỗ trước ngày tạo tài khoản. Những trường hợp này cần được đối chiếu với định nghĩa các mốc thời gian trước khi quyết định đưa vào tập huấn luyện.
 """, [("Kiểm tra định danh và logic thời gian", checks), ("NA và giá trị đặc biệt là các khái niệm khác nhau", sentinel), ("Ngày booking có/không × nhãn có/không booking", pd.crosstab(train.date_first_booking.notna().rename("has_booking_date"), booked.rename("observed_booking")).reset_index())])
     target = train.country_destination.value_counts().rename_axis("country_destination").reset_index(name="n")
     target["pct_all_users"] = target.n/n*100
@@ -817,7 +817,7 @@ def make_notebook(root, dataset):
     from scripts.eda_diagnostics import SECTION_LAYOUT
     titles = {dataset: [title for key,title in SECTION_LAYOUT]}
     keys = {dataset: [key for key,title in SECTION_LAYOUT]}
-    cells = [nbf.v4.new_markdown_cell(f"# {dataset} — Báo cáo hiểu sâu dữ liệu\n\n**Phạm vi: EDA trên dữ liệu gốc; chưa feature engineering, chưa huấn luyện mô hình.**\n\nBáo cáo có từ điển dữ liệu, kiểm tra chất lượng/khóa/nhãn, thống kê theo nhóm, thời gian và giới hạn suy rộng. Các kết quả được tính lại từ CSV; bản đọc nhanh nằm ở `reports/{dataset}/README.md`.\n\nMọi phân nhóm tạm thời chỉ phục vụ mô tả, không tạo tập feature. Chạy tất cả các cell theo thứ tự; cell đầu quét dữ liệu đầy đủ nên có thể mất vài phút với Expedia. Executive summary nằm đầu; bảng kiểm kê dài chuyển sang phụ lục. Mỗi hình có nhận xét riêng ngay bên dưới."),
+    cells = [nbf.v4.new_markdown_cell(f"# {dataset} — Báo cáo hiểu sâu dữ liệu\n\n**Phạm vi: EDA trên dữ liệu gốc; chưa feature engineering, chưa huấn luyện mô hình.**\n\nBáo cáo có từ điển dữ liệu, kiểm tra chất lượng/khóa/nhãn, thống kê theo nhóm, thời gian và giới hạn suy rộng. Các kết quả được tính lại từ CSV; bản đọc nhanh nằm ở `reports/{dataset}/README.md`.\n\nMọi phân nhóm tạm thời chỉ phục vụ mô tả, không tạo tập feature. Chạy tất cả các cell theo thứ tự; cell đầu quét dữ liệu đầy đủ nên có thể mất vài phút với Expedia. Phần tóm tắt điều hành nằm đầu; bảng kiểm kê dài chuyển sang phụ lục. Mỗi hình có nhận xét riêng ngay bên dưới."),
              nbf.v4.new_code_cell("from pathlib import Path\nimport importlib\nimport sys\n\nPROJECT_ROOT = Path.cwd().resolve()\nwhile not (PROJECT_ROOT / 'data' / 'raw').is_dir():\n    if PROJECT_ROOT == PROJECT_ROOT.parent:\n        raise FileNotFoundError('Không tìm thấy data/raw; hãy mở notebook trong dự án Propensity.')\n    PROJECT_ROOT = PROJECT_ROOT.parent\nif str(PROJECT_ROOT) not in sys.path:\n    sys.path.insert(0, str(PROJECT_ROOT))\nfrom scripts import build_descriptive_reports as eda\nimportlib.reload(eda)\n"+f"report = eda.build_report('{dataset}', PROJECT_ROOT)\n"+"print('Đã tính lại từ CSV raw; số chính:', report.facts)\nprint('Chỉ xuất báo cáo, metadata và biểu đồ; không tạo dữ liệu mô hình.')")]
     if dataset == "AIRBNB":
         from scripts.airbnb_deep_dive import AIRBNB_LAYOUT
@@ -825,7 +825,9 @@ def make_notebook(root, dataset):
         titles[dataset] = [title for _, title in AIRBNB_LAYOUT]
         introduction = """# AIRBNB — Báo cáo dữ liệu và thiết kế nghiên cứu propensity
 
-**Phạm vi:** EDA trên raw, phân tích nhãn/độ trễ/cohort và đề xuất thiết kế. Chưa làm sạch, tạo feature, tạo tập chia hoặc huấn luyện mô hình.
+**Phạm vi:** notebook phân tích mô tả dữ liệu gốc, gồm nhãn y, độ trễ và các nhóm đăng ký theo thời gian. Báo cáo đề xuất thiết kế thí nghiệm cho giai đoạn tiếp theo. Mọi số liệu là thống kê mô tả, chưa phải kết quả mô hình hoặc bằng chứng về tác động nhân quả.
+
+Bảng thuật ngữ và tóm tắt điều hành nằm ở đầu phần kết quả. Các bảng chi tiết được chuyển xuống phụ lục để thuận tiện tra cứu.
 
 Notebook có output lưu sẵn để đọc ngay. **Notebook phụ thuộc package scripts/ và CSV của dự án; một file notebook riêng không chạy độc lập.** Khi nộp cần kèm code và hướng dẫn lấy dữ liệu sau:
 
