@@ -8,7 +8,7 @@ Ngày phân tích: 2026-11-02. Đây không phải ngày thu thập dữ liệu.
 
 Mọi số liệu trong báo cáo là thống kê mô tả từ dữ liệu gốc. Chúng cho biết các liên hệ trong mẫu, chưa phải kết quả dự báo hoặc bằng chứng về tác động nhân quả. Báo cáo dừng ở EDA và thiết kế thí nghiệm, chưa xử lý dữ liệu cho mô hình hoặc huấn luyện mô hình.
 
-Báo cáo dùng thống nhất “nhãn y” cho kết quả gốc và “nhãn y90” cho mục tiêu nghiên cứu 90 ngày và “lượt đặt chỗ đầu tiên” cho hành vi cần dự đoán. Tên cột và mã giá trị được giữ nguyên để đối chiếu với dữ liệu.
+Báo cáo dùng thống nhất “nhãn y” cho kết quả gốc, “nhãn y90” cho mục tiêu nghiên cứu 90 ngày và “lượt đặt chỗ đầu tiên” cho hành vi cần dự đoán. Tên cột và mã giá trị được giữ nguyên để đối chiếu với dữ liệu.
 
 Quy ước số: dấu chấm biểu diễn phần thập phân; dấu phẩy phân tách hàng nghìn. Tên cột gốc chỉ dùng khi cần đối chiếu dữ liệu.
 
@@ -31,38 +31,42 @@ Quy ước số: dấu chấm biểu diễn phần thập phân; dấu phẩy ph
 | Train / test | Tập có nhãn dùng cho nghiên cứu / tập Kaggle không có nhãn, dùng đối chiếu cấu trúc và phân phối. |
 | NA / unknown / untracked | Giá trị bị thiếu / mã không rõ thông tin / mã không theo dõi được. Báo cáo giữ riêng ba trường hợp. |
 | Mốc bắt đầu dự đoán (origin) | Thời điểm lịch bắt đầu một lượt đánh giá. Dữ liệu dùng huấn luyện phải có sẵn trước mốc này. |
-| Nhãn y90 | Nhãn nghiên cứu 90 ngày có điều kiện: 1 nếu độ trễ từ 0 đến 90; 0 nếu muộn hơn hoặc NDF dưới giả định theo dõi đủ 365 ngày. Ngoại lệ ngày âm chưa gán nhãn. |
-| Khoảng đệm thời gian (embargo) | Khoảng ngày đăng ký bị bỏ khỏi tập trước để nhãn 90 ngày hoàn tất trước khi dự đoán tập sau. Ở đây đệm 90 ngày lịch và chỉ dùng nhãn đã có trước mốc dự đoán. |
+| Nhãn y90 | 1 nếu độ trễ từ 0 đến 90 ngày; 0 nếu muộn hơn hoặc NDF dưới giả định theo dõi ít nhất 90 ngày. Ngoại lệ ngày âm chưa gán. |
+| Nhãn đã hoàn tất tại mốc tháng | Chỉ dùng người có ngày đăng ký + 90 ngày nhỏ hơn mốc dự đoán. Mô hình tại mỗi mốc học trên toàn bộ nhãn hợp lệ đã hoàn tất. |
+| LR (Logistic Regression) | Hồi quy logistic, mô hình đối chứng ước lượng xác suất. Phiên bản có tương tác cặp cho phép ảnh hưởng của một biến thay đổi theo biến khác. |
+| OOF theo thời gian | Dự đoán ngoài tập học: mô hình tạo điểm cho một người chỉ học nhãn đã sẵn có trước mốc lịch sử của người đó. Người được chấm không thuộc tập học tạo điểm. |
+| Hiệu chỉnh xác suất | Điều chỉnh điểm dự đoán để xác suất phù hợp hơn với tỷ lệ thực tế, dùng dữ liệu ngoài tập học của mô hình tạo điểm. |
+| ECE | Sai lệch hiệu chỉnh kỳ vọng: chia dự đoán thành các nhóm, lấy trung bình có trọng số của chênh lệch tuyệt đối giữa xác suất trung bình và tỷ lệ dương từng nhóm. Thiết kế dùng 10 nhóm đồng số mẫu. |
 
 ## Tóm tắt điều hành
 
-**Kết luận:** có thể nghiên cứu xác suất đặt chỗ trong 90 ngày bằng nhãn có điều kiện dưới giả định theo dõi đủ 365 ngày. Thiết kế đánh giá dùng khoảng đệm theo ngày lịch và đối chứng Logistic Regression mạnh để kiểm tra giá trị bổ sung của CatBoost. (Nguồn: bảng B9 và B7.)
+**Kết luận:** nghiên cứu y90 cần giả định NDF được theo dõi ít nhất 90 ngày. Thiết kế chính không phụ thuộc hai cờ hồ sơ chưa xác nhận tại t0, đánh giá theo nhiều mốc tháng và học trên toàn bộ nhãn đã hoàn tất ở từng mốc. (Nguồn: bảng B9, B17 và B7.)
 
 **Năm phát hiện chính**
 
 1. **Quy mô và nhãn y:** tập train có 213,451 người dùng, trong đó 88,908 người có lượt đặt chỗ đầu tiên (41.65%). Tập test có 62,096 người dùng. Hai nhóm nhãn y có quy mô đủ lớn để bắt đầu thí nghiệm với phân phối lớp hiện có. (Nguồn: bảng B1.)
 
-2. **Nhãn nghiên cứu 90 ngày có điều kiện:** có 74,027 người đặt chỗ trong 90 ngày, bằng 34.68% toàn bộ 213,451 dòng. Với giả định theo dõi đủ 365 ngày và loại 29 ngoại lệ chưa gán, mẫu nghiên cứu còn 213,422 người, tỷ lệ dương 34.69%. Đây là tỷ lệ trên toàn bộ mẫu người dùng tương ứng, khác với mức bao phủ trong nhóm đã đặt chỗ. (Nguồn: bảng B9.)
+2. **Nhãn nghiên cứu 90 ngày có điều kiện:** có 74,027 người đặt chỗ trong 90 ngày, bằng 34.68% toàn bộ 213,451 dòng. Với giả định NDF được theo dõi ít nhất 90 ngày và loại 29 ngoại lệ chưa gán, mẫu còn 213,422 người, tỷ lệ dương 34.69%. Không cần giả định mọi người được theo dõi một năm. (Nguồn: bảng B9.)
 
-3. **Tín hiệu chung về độ đầy đủ hồ sơ:** trong năm 2014, FEMALE và MALE có tỷ lệ nhãn y=1 gần như nhau (50.84% và 50.95%). Nhóm không rõ giới tính có tỷ lệ 26.54%. Người có tuổi đạt 54.54%, so với 18.01% ở người thiếu tuổi. Hai cờ thiếu hồ sơ có V=0.783, nên đây là tín hiệu chồng lặp cần kiểm tra giá trị bổ sung, không phải hai phát hiện dự báo độc lập. Cả hai chỉ được dùng sau khi xác minh tại t0. (Nguồn: bảng B10.)
+3. **Hai cờ hồ sơ có cơ chế cần kiểm tra:** trong năm 2014, nhóm có tuổi nhưng không rõ giới tính có y90=57.46%, cao hơn nhóm có cả hai thông tin (41.10%). Bốn nhóm không tăng đơn điệu theo mức điền hồ sơ, dù hai cờ có V=0.783. Chưa thể quy về một tín hiệu đầy đủ chung hoặc xác nhận thời điểm có sẵn. Chúng nằm ngoài nhánh chính và chỉ được dùng sau khi Q1 có bằng chứng. (Nguồn: bảng B10.)
 
-4. **Chênh lệch ứng dụng sau phân tầng hồ sơ:** trong nhóm năm 2014 có tuổi và có khai báo giới tính, tỷ lệ nhãn y=1 của Web là 54.73%, iOS 39.56% và Android 39.85%. Chênh lệch vẫn hiện diện sau khi tách hai cờ hồ sơ. Bảng chi tiết báo cả nhãn y và y90 cùng cỡ mẫu; kết quả vẫn là mô tả và chưa kiểm soát mọi khác biệt. (Nguồn: bảng B11.)
+4. **Chênh lệch ứng dụng theo đúng mục tiêu y90:** trong nhóm năm 2014 có tuổi và có khai báo giới tính, Web đạt 44.60%, iOS 26.79% và Android 29.14%. Các nhóm giao cờ khác có tương quan ứng dụng khác nhau; LR đối chứng phải có tương tác cặp khi các cột được chấp nhận tại t0. Các tỷ lệ này là mô tả, không phải chất lượng của nhánh chính. (Nguồn: bảng B11.)
 
-5. **Phạm vi nhật ký hoạt động:** trong năm 2014, 96.53% người dùng train và 99.31% người dùng test có sessions, chênh 2.78 điểm phần trăm. Tỷ lệ có đặt chỗ trong nhóm có nhật ký là 38.98%, so với 17.54% ở nhóm thiếu nhật ký. Vì dữ liệu trước năm 2014 không có sessions, nghiên cứu riêng nguồn này cần tập trung vào 76,466 người dùng train đăng ký năm 2014. (Nguồn: bảng B5.)
+5. **Phạm vi nhật ký hoạt động:** trong năm 2014, 96.53% người dùng train và 99.31% người dùng test có sessions, chênh 2.78 điểm phần trăm. Tỷ lệ có nhãn y=1 gốc trong nhóm có nhật ký là 38.98%, so với 17.54% ở nhóm thiếu nhật ký. Vì dữ liệu trước năm 2014 không có sessions, nghiên cứu riêng nguồn này cần tập trung vào 76,466 người dùng train đăng ký năm 2014. (Nguồn: bảng B5.)
 
 **Ba việc cần giải quyết trước khi huấn luyện**
 
-1. **Chốt giả định nhãn và xử lý ngoại lệ.** Cho phép nghiên cứu y90 dưới giả định theo dõi đủ 365 ngày, báo độ nhạy khi không gán âm cho NDF và giữ 29 ngoại lệ ngoài mẫu y90. Q3 cần xác nhận chính thức trước triển khai, thay vì chặn toàn bộ nghiên cứu có điều kiện. (Nguồn: bảng B9 và Q3.)
+1. **Chốt giả định theo dõi tối thiểu.** Xác nhận NDF được theo dõi ít nhất 90 ngày và giữ 29 ngoại lệ ngoài mẫu y90. Kiểm tra theo tháng và thay đổi giả định sai nhãn NDF trên cùng mẫu người dùng; không dùng riêng nhóm đã đặt chỗ làm độ nhạy hoặc tập học. (Nguồn: bảng B9, B15, B16 và Q3.)
 
-2. **Chốt thông tin có sẵn tại t0.** Xác minh hồ sơ và các cờ thiếu phản ánh lúc đăng ký. Loại ngày đặt chỗ và cờ thiếu của cột này khỏi đầu vào vì mức khớp nhãn y là 100%. Nhật ký thiếu thời điểm sự kiện vẫn ngoài thiết kế chính. (Nguồn: bảng B8 và Q1.)
+2. **Chặn đầu vào chưa có bằng chứng tại t0.** Nhánh chính tối thiểu dùng mốc tạo tài khoản. Mở rộng từng cột sự kiện đăng ký sau khi có căn cứ nguồn; hai cờ hồ sơ thuộc nhánh B và bị chặn khi Q1 còn mở. Ngày đặt chỗ và cờ thiếu của cột này tiết lộ nhãn y ở 100% trường hợp nên luôn bị loại khỏi đầu vào. (Nguồn: bảng B8, B17 và Q1.)
 
-3. **Dùng đối chứng mạnh và khoảng đệm.** Chọn cấu hình cùng LR đối chứng trên các lượt kiểm định có đệm 90 ngày. Huấn luyện lại đến 2013-10-02, hiệu chỉnh trên 2014-01-01 đến 2014-01-30, rồi đánh giá tháng 5–6/2014. CatBoost phải tăng giá trị so với LR trên cùng nhãn y90 và cùng cửa sổ, không chỉ vượt xác suất hằng. (Nguồn: bảng B7.)
+3. **Đánh giá tại từng mốc tháng.** Tại 2014-05-01 học đến ngày đăng ký 2014-01-30; tại 2014-06-01 học đến 2014-03-02. Mỗi mốc dùng toàn bộ nhãn đã hoàn tất và điểm OOF theo thời gian để hiệu chỉnh. So sánh LR có tương tác với CatBoost trên cùng nhánh; mọi ứng viên phải đạt chuẩn hiệu chỉnh tuyệt đối trước khi được chấp nhận. (Nguồn: bảng B7.)
 
 ## 1. Bài toán và lý do chọn dữ liệu
 
 Bài toán nghiên cứu chính là ước lượng xác suất người dùng mới có lượt đặt chỗ đầu tiên trong 90 ngày kể từ lúc đăng ký. Thời điểm dự đoán t0 là ngay sau khi tạo tài khoản.
 
-Nhãn y90 được xây dựng có điều kiện dưới giả định mỗi người được theo dõi đủ 365 ngày. Cột điểm đến gốc vẫn xác định nhãn y để mô tả bộ dữ liệu; y và y90 là hai mục tiêu khác nhau. Các bảng EDA cũ tiếp tục ghi rõ nhãn y, còn thiết kế mô hình và bảng B7 dùng y90. Quy tắc và mẫu số của y90 nằm ở B9.
+Nhãn y90 được xây dựng dưới giả định NDF được theo dõi ít nhất 90 ngày. Cột điểm đến gốc vẫn xác định nhãn y để mô tả bộ dữ liệu; y và y90 là hai mục tiêu khác nhau. Thiết kế mô hình và bảng B7 dùng y90. Quy tắc và mẫu số nằm ở B9.
 
 Thông tin đầu vào chỉ hợp lệ nếu phản ánh hồ sơ tại t0. Các cột ngày đặt chỗ, cờ thiếu ngày đặt chỗ và nhật ký chưa có thời điểm sự kiện bị loại khỏi thiết kế chính. Các ngoại lệ ngày đặt chỗ âm được giữ trong EDA nhãn y nhưng chưa gán y90.
 
@@ -214,9 +218,9 @@ Bảng dưới tóm tắt quyết định theo nhóm cột. Bảng quyết đị
 | Hồ sơ người dùng | Dùng đối chiếu và ghép; loại khỏi đầu vào | 1 |
 | Hồ sơ người dùng | Dùng kiểm tra và chia thời gian; cân nhắc đầu vào riêng | 2 |
 | Hồ sơ người dùng | Loại ngày và cờ thiếu khỏi đầu vào | 1 |
-| Hồ sơ người dùng | Ứng viên có điều kiện | 9 |
-| Hồ sơ người dùng | Ứng viên có điều kiện; tuổi và cờ thiếu cần cùng được kiểm tra | 1 |
-| Hồ sơ người dùng | Ứng viên có điều kiện; không coi là đại lượng liên tục | 1 |
+| Hồ sơ người dùng | Ngoài nhánh chính; chỉ nhánh B sau xác nhận Q1, gồm cả cờ thiếu | 2 |
+| Hồ sơ người dùng | Nhánh A1 chỉ sau bằng chứng của sự kiện đăng ký; hiện chưa xác nhận từ CSV | 3 |
+| Hồ sơ người dùng | Ứng viên có điều kiện | 6 |
 | Hồ sơ người dùng | Chỉ dùng tạo nhãn và đánh giá | 1 |
 | Nhật ký hoạt động | Dùng đối chiếu khóa | 1 |
 | Nhật ký hoạt động | Loại khỏi đầu vào của thiết kế tại t0 | 5 |
@@ -270,11 +274,11 @@ Biểu đồ hiển thị top 8 nhóm theo số lượng; bảng kiểm kê gi�
 
 **Trong các lượt đặt chỗ có độ trễ hợp lệ, 83.29% xảy ra trong 90 ngày đầu** và 16.71% xảy ra muộn hơn. Vì mẫu số chỉ gồm người đã đặt chỗ, các tỷ lệ này mô tả tốc độ phát sinh đặt chỗ trong nhóm đó. Xác suất đặt chỗ của toàn bộ người dùng cần một mẫu số khác, gồm cả người mang nhãn y=0.
 
-Ngày đặt chỗ muộn nhất là 2015-06-29, cách ngày tạo tài khoản cuối 2014-06-30 là 364 ngày. Độ trễ lớn nhất của từng nhóm năm đăng ký đều bằng 365 ngày. Hai quan sát này ủng hộ mạnh giả thuyết mỗi người được theo dõi tối đa 365 ngày kể từ đăng ký. Chúng chưa trực tiếp xác nhận thời gian theo dõi của từng người mang mã NDF.
+Nhãn y90 chỉ yêu cầu được theo dõi ít nhất 90 ngày. Giới hạn độ trễ 365 ngày trong các nhóm năm là bằng chứng về cấu trúc dữ liệu, không phải điều kiện cần của y90 và không chứng minh mọi NDF đã được theo dõi một năm.
 
-Báo cáo dùng giả thuyết theo dõi đủ 365 ngày làm giả định làm việc để xây dựng nhãn nghiên cứu y90 ngay trong EDA. Đây là phân tích có điều kiện và có kịch bản độ nhạy, thay vì chặn toàn bộ nghiên cứu 90 ngày. Xác nhận chính thức cơ chế theo dõi vẫn là điều kiện trước khi suy rộng hoặc triển khai.
+Báo cáo gán y90 dưới giả định NDF được theo dõi đủ 90 ngày. Với mốc kết thúc chung giả định 2015-06-29, toàn bộ train có khoảng lịch ít nhất 90 ngày, còn khoảng 99.72% có đủ 365 ngày. Mốc này chỉ là phép kiểm tra lịch có điều kiện, không phải ngày theo dõi thực tế đã xác nhận cho từng người.
 
-Nhãn y90 bằng 1 nếu ngày đặt chỗ đầu tiên cách ngày tạo tài khoản từ 0 đến 90 ngày, gồm cả hai đầu. Nhãn bằng 0 cho lượt đặt chỗ muộn hơn 90 ngày và cho NDF dưới giả định theo dõi đủ 365 ngày. Các ngoại lệ ngày đặt chỗ âm để trạng thái chưa gán. Ngày 0 được giữ theo độ phân giải ngày của CSV; Q1/Q2 vẫn cần làm rõ thứ tự trong ngày.
+Nhãn y90 bằng 1 khi độ trễ đặt chỗ từ 0 đến 90 ngày, gồm cả hai đầu. Các lượt đặt chỗ sau ngày 90 có nhãn 0. NDF chỉ có nhãn 0 dưới giả định theo dõi tối thiểu trên. Ngoại lệ ngày đặt chỗ âm chưa được gán. Nhóm chỉ gồm người đã đặt chỗ có thể mô tả phần nhãn quan sát được nhưng bị chọn theo kết quả, nên không được dùng làm tập huấn luyện hoặc gọi là phân tích độ nhạy.
 
 **B6 · Phân phối độ trễ: mẫu số và ngoại lệ**
 
@@ -312,11 +316,11 @@ Nhãn y90 bằng 1 nếu ngày đặt chỗ đầu tiên cách ngày tạo tài 
 | 2015-06-29 | 90 | 213,451 | 100 | Chỉ đúng nếu mọi user thực sự được theo dõi tới mốc giả định |
 | 2015-06-29 | 365 | 212,861 | 99.7236 | Chỉ đúng nếu mọi user thực sự được theo dõi tới mốc giả định |
 
-**B9 · Nhãn nghiên cứu 90 ngày dưới giả định theo dõi 365 ngày**
+**B9 · Nhãn y90 dưới giả định theo dõi ít nhất 90 ngày**
 
-| Giả định theo dõi (ngày) | Thời hạn (ngày) | Toàn bộ người dùng | Dương tính y90 | Âm tính y90 có điều kiện | Chưa gán nhãn | Mẫu hợp lệ | Dương tính trên toàn bộ dòng (%) | Dương tính trên mẫu hợp lệ (%) |
+| Giả định theo dõi tối thiểu (ngày) | Thời hạn (ngày) | Toàn bộ người dùng | Dương tính y90 | Âm tính y90 có điều kiện | Chưa gán nhãn | Mẫu hợp lệ | Dương tính trên toàn bộ dòng (%) | Dương tính trên mẫu hợp lệ (%) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 365 | 90 | 213,451 | 74,027 | 139,395 | 29 | 213,422 | 34.681 | 34.6857 |
+| 90 | 90 | 213,451 | 74,027 | 139,395 | 29 | 213,422 | 34.681 | 34.6857 |
 
 **Quy tắc gán nhãn 90 ngày và số lượng**
 
@@ -324,21 +328,57 @@ Nhãn y90 bằng 1 nếu ngày đặt chỗ đầu tiên cách ngày tạo tài 
 | --- | --- | --- | --- |
 | Đã đặt chỗ, độ trễ từ 0 đến 90 ngày | 74,027 | 1 | Đã quan sát lượt đặt chỗ trong thời hạn |
 | Đã đặt chỗ, độ trễ lớn hơn 90 ngày | 14,852 | 0 | Lượt đặt chỗ đầu tiên xảy ra sau thời hạn |
-| NDF | 124,543 | 0 có điều kiện | Chỉ gán âm khi chấp nhận giả định theo dõi đủ 365 ngày |
+| NDF | 124,543 | 0 có điều kiện | Cần theo dõi đủ ít nhất 90 ngày, không cần đủ 365 ngày |
 | Ngày đặt chỗ âm hoặc không xác định | 29 | Chưa gán | Loại khỏi mẫu nghiên cứu 90 ngày cho đến khi xác minh |
-
-**Độ nhạy khi không giả định theo dõi cho NDF**
-
-| Kịch bản | Dương tính | Âm tính xác định trong kịch bản | Chưa xác định | Mẫu gán được nhãn |
-| --- | --- | --- | --- | --- |
-| Giả định mỗi người được theo dõi 365 ngày | 74,027 | 139,395 | 29 | 213,422 |
-| Chỉ dùng bằng chứng lượt đặt chỗ đã ghi nhận | 74,027 | 14,852 | 124,572 | 88,879 |
 
 ![booking delay](figures/booking_delay.png)
 
 **Quan sát:** trong 88,879 lượt đặt chỗ có độ trễ không âm, 75.33% xảy ra trong 30 ngày, 80.26% trong 60 ngày và 83.29% trong 90 ngày. Phần tăng thêm từ ngày 30 đến ngày 90 cho thấy lợi ích về mức bao phủ khi kéo dài thời hạn. Mẫu số chỉ gồm các lượt đặt chỗ có độ trễ hợp lệ. Bảng ngoại lệ thống kê riêng 29 trường hợp độ trễ âm.
 
 **Phạm vi và cách đọc:** Người đã đặt chỗ và có độ trễ không âm. Các tỷ lệ không đại diện cho toàn bộ người dùng.
+
+### Theo dõi 90 ngày: bằng chứng theo tháng và độ nhạy giả định
+
+Tỷ lệ trong 90 ngày trên nhóm đã đặt chỗ được kiểm tra theo tháng để tìm dấu hiệu cắt cụt ở cuối train. Sự ổn định của tỷ lệ này chưa xác nhận thời gian theo dõi NDF. Phân tích độ nhạy giữ nguyên mẫu người dùng: giả sử một tỷ lệ NDF có đặt chỗ 90 ngày chưa được ghi nhận, rồi tính khoảng thay đổi tỷ lệ dương. Tham số này chưa được ước lượng từ dữ liệu. Các kết quả không phải nhãn thật mới, không dùng huấn luyện và chưa đánh giá độ nhạy của chất lượng mô hình.
+
+B15 cho thấy tỷ lệ trong 90 ngày trên người đã đặt chỗ ở tháng 1–6/2014 nằm trong 80.98–83.31%. Tỷ lệ không giảm dần về cuối train, nên chưa thấy dấu hiệu cắt cụt từ phép kiểm tra này. B16 kiểm tra giả định khác: nếu có đặt chỗ sớm chưa được ghi nhận trong NDF, tỷ lệ dương thay đổi ra sao khi vẫn giữ nguyên 213,422 người. Đây là độ nhạy của tỷ lệ nhãn với sai nhãn giả định, chưa phải độ nhạy của chất lượng dự đoán.
+
+**B15 · Mức bao phủ 90 ngày theo tháng trên nhóm đã đặt chỗ**
+
+| Tháng đăng ký | Người dùng | Người đã đặt chỗ · độ trễ hợp lệ | Đặt chỗ trong 90 ngày | Trong 90 ngày trên nhóm đã đặt chỗ (%) | Cận dưới Wilson 95% (%) | Cận trên Wilson 95% (%) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2014-01 | 11,111 | 4,142 | 3,354 | 80.9754 | 79.7516 | 82.1418 |
+| 2014-02 | 9,967 | 3,888 | 3,197 | 82.2274 | 80.9941 | 83.397 |
+| 2014-03 | 12,058 | 4,622 | 3,827 | 82.7997 | 81.6846 | 83.8603 |
+| 2014-04 | 12,689 | 4,901 | 4,083 | 83.3095 | 82.2396 | 84.3273 |
+| 2014-05 | 14,895 | 5,754 | 4,793 | 83.2986 | 82.3127 | 84.24 |
+| 2014-06 | 15,746 | 5,932 | 4,919 | 82.9231 | 81.9443 | 83.8594 |
+
+**Khoảng lịch theo một ngày kết thúc chung giả định**
+
+| Ngày kết thúc giả định chung | Khoảng lịch tối thiểu (ngày) | Số người có đủ khoảng lịch | Mẫu số | Tỷ lệ (%) |
+| --- | --- | --- | --- | --- |
+| 2015-06-29 | 90 | 213,451 | 213,451 | 100 |
+| 2015-06-29 | 365 | 212,861 | 213,451 | 99.7236 |
+
+**B16 · Độ nhạy với sai nhãn NDF trên cùng mẫu người dùng**
+
+| Phạm vi sai nhãn giả định | NDF có đặt chỗ 90 ngày chưa ghi nhận (%) | NDF chịu tác động | Mẫu người dùng giữ cố định | Dương tính đã ghi nhận | Dương tính bổ sung kỳ vọng | Tỷ lệ dương kỳ vọng (%) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Mọi NDF | 0 | 124,543 | 213,422 | 74,027 | 0 | 34.6857 |
+| Mọi NDF | 1 | 124,543 | 213,422 | 74,027 | 1,245.43 | 35.2693 |
+| Mọi NDF | 5 | 124,543 | 213,422 | 74,027 | 6,227.15 | 37.6035 |
+| Mọi NDF | 10 | 124,543 | 213,422 | 74,027 | 12,454.3 | 40.5213 |
+| Chỉ NDF đăng ký năm 2014 | 0 | 47,227 | 213,422 | 74,027 | 0 | 34.6857 |
+| Chỉ NDF đăng ký năm 2014 | 1 | 47,227 | 213,422 | 74,027 | 472.27 | 34.907 |
+| Chỉ NDF đăng ký năm 2014 | 5 | 47,227 | 213,422 | 74,027 | 2,361.35 | 35.7922 |
+| Chỉ NDF đăng ký năm 2014 | 10 | 47,227 | 213,422 | 74,027 | 4,722.7 | 36.8986 |
+
+![followup profile cohorts](figures/followup_profile_cohorts.png)
+
+**Quan sát:** mức bao phủ trong người đã đặt chỗ không giảm dần ở các tháng cuối train; tỷ lệ thiếu hồ sơ khác nhau giữa các tháng và giữa train/test.
+
+**Phạm vi và cách đọc:** hình trái chỉ có người đã đặt chỗ với độ trễ hợp lệ, nên chưa xác nhận theo dõi NDF. Hình phải dùng mọi người trong từng tháng, kể cả test không có nhãn. Mức độ mới của tháng và cơ cấu luồng đăng ký cùng thay đổi; không diễn giải xu hướng thành bằng chứng thời điểm cập nhật hồ sơ.
 
 ### Độ mạnh liên hệ với nhãn y trên toàn bộ biến ứng viên
 
@@ -348,7 +388,7 @@ Giới tính khai báo có V=0.207 trên toàn kỳ và 0.251 trong năm 2014. �
 
 Công thức, giả định kiểm định và điều chỉnh nhiều phép so sánh nằm ở mục Tái lập và kiểm soát phạm vi. Báo cáo chưa đưa AUC vì chưa huấn luyện mô hình. [Phương pháp Cramér V](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.contingency.association.html) và [Mann–Whitney](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.mannwhitneyu.html) được đối chiếu từ tài liệu SciPy.
 
-Cramér V của giới tính và cờ thiếu tuổi không được xem là hai bằng chứng dự báo độc lập. Phần độ đầy đủ hồ sơ bên dưới định lượng mức chồng lặp và tách chênh lệch ứng dụng trong từng nhóm hồ sơ.
+Cramér V của giới tính và cờ thiếu tuổi không được xem là hai bằng chứng dự báo độc lập. Phần cơ chế thiếu hồ sơ bên dưới định lượng mức chồng lặp và tách chênh lệch ứng dụng trong từng nhóm hồ sơ.
 
 **B3 · Các liên hệ chính cần kiểm tra**
 
@@ -366,25 +406,43 @@ Cramér V của giới tính và cờ thiếu tuổi không được xem là hai
 
 **Phạm vi và cách đọc:** V tính trên toàn bộ người dùng trong từng phạm vi, gồm giá trị thiếu như một nhóm. Rank-biserial chỉ tính trên tuổi 16–100 và được đặt trên trục riêng. Hai thước đo không dùng chung ngưỡng so sánh. Liên hệ của cờ thiếu cần được kiểm tra về thời điểm có sẵn tại t0.
 
-### Độ đầy đủ hồ sơ và chênh lệch ứng dụng sau phân tầng
+### Cơ chế thiếu hồ sơ và rủi ro về thời điểm có sẵn
 
 Trong nhóm đăng ký năm 2014, tỷ lệ có nhãn y=1 của FEMALE và MALE gần bằng nhau, lần lượt 50.84% và 50.95%. Nhóm không rõ giới tính chỉ đạt 26.54%. Vì vậy, liên hệ biên của cột giới tính chủ yếu phản ánh sự khác nhau giữa hồ sơ có và thiếu thông tin, không nên trình bày như một hiệu ứng riêng của giới tính.
 
-Cờ thiếu tuổi và cờ không rõ giới tính có Cramér V=0.783. Đây là liên hệ mạnh giữa hai chỉ báo đầu vào, cho thấy tín hiệu chồng lặp. Nó không tự chứng minh cộng tuyến hoàn toàn hoặc quan hệ nhân quả. Cần kiểm tra loại từng cờ trong cùng thiết kế Logistic Regression và CatBoost.
+Cờ thiếu tuổi và cờ không rõ giới tính có Cramér V=0.783. Tuy vậy, nhóm có tuổi nhưng không rõ giới tính có y90=57.46%, cao hơn nhóm có cả tuổi và khai báo giới tính (41.10%). Bốn ô không tăng đơn điệu theo số thông tin được điền. Vì vậy, báo cáo không diễn giải hai cờ thành một thang mức độ đầy đủ hồ sơ.
+
+Một cơ chế có thể là luồng đăng ký khác nhau hoặc hồ sơ được bổ sung khi đặt chỗ. Các bảng phương thức đăng ký, nhóm thời gian gồm cả test và ứng viên cập nhật hồ sơ trong nhật ký kiểm tra gián tiếp các giả thuyết này. Chúng không xác định được thời điểm điền tuổi hay giới tính vì CSV thiếu lịch sử hồ sơ và nhật ký không có thời điểm sự kiện. Hai cờ nằm ngoài nhánh chính; chỉ được đưa vào nhánh có điều kiện khi Q1 có bằng chứng xác nhận.
 
 Bảng và hình dưới tách đồng thời năm đăng ký, tình trạng thiếu tuổi và tình trạng không rõ giới tính trước khi so sánh ứng dụng. Chúng báo cả nhãn y hiện có và nhãn y90 có điều kiện. Các khoảng Wilson dành cho tỷ lệ y90 trong từng ô, với n<100 được đánh dấu. Giá trị tuổi và các cờ thiếu vẫn phải được xác minh là có sẵn tại t0.
 
-**B10 · Tín hiệu độ đầy đủ hồ sơ · năm 2014**
+**Kết quả kiểm tra gián tiếp:** trong năm 2014, nhóm thiếu cả hai thông tin chiếm 55.81% người đăng ký basic, so với 0.43% qua facebook (B12). Cơ cấu luồng đăng ký vì vậy là một lời giải thích cần kiểm tra. Tuy nhiên, ngay trong basic, nhóm có tuổi nhưng không rõ giới tính vẫn có y90=58.21%, so với 53.13% ở nhóm có cả hai thông tin. Tách cách đăng ký chưa giải thích hết chênh lệch.
 
-| Năm đăng ký | FEMALE · nhãn y (%) | MALE · nhãn y (%) | Không rõ giới tính · nhãn y (%) | Có tuổi · nhãn y (%) | Thiếu tuổi · nhãn y (%) | V giữa hai cờ thiếu hồ sơ |
-| --- | --- | --- | --- | --- | --- | --- |
-| 2014 | 50.838 | 50.9549 | 26.5401 | 54.5444 | 18.0087 | 0.7831 |
+Tỷ lệ không rõ giới tính ở train tháng 1–6/2014 nằm trong 51.38–52.53%, còn test tháng 7–9/2014 là 53.94–54.80% (B13). Test mới hơn có tỷ lệ thiếu cao hơn, nhưng cơ cấu đăng ký và quá trình thu thập cũng có thể thay đổi. So sánh này chưa tách được các cơ chế.
+
+Trong 73,815 người đăng ký năm 2014 có nhật ký, 25,010 người (33.88%) có ít nhất một chi tiết hành động thuộc nhóm chỉnh sửa/cập nhật hồ sơ (B14 và bảng giao cờ bên cạnh). Mỗi người chỉ được đếm một lần trong tổng này. Các tên hành động rộng được báo riêng. Nhật ký cho thấy có hoạt động liên quan đến hồ sơ, nhưng không cho biết đó có phải thay đổi tuổi/giới tính hay xảy ra trước hoặc sau đăng ký/đặt chỗ. Do đó, Q1 vẫn chặn nhánh B.
+
+**B10 · Bốn nhóm hồ sơ và hai cờ liên hệ mạnh · năm 2014**
+
+| Chỉ tiêu | Giá trị |
+| --- | --- |
+| Năm đăng ký | 2014 |
+| FEMALE · nhãn y (%) | 50.84 |
+| MALE · nhãn y (%) | 50.95 |
+| Không rõ giới tính · nhãn y (%) | 26.54 |
+| Có tuổi · nhãn y (%) | 54.54 |
+| Thiếu tuổi · nhãn y (%) | 18.01 |
+| V giữa hai cờ thiếu hồ sơ | 0.783 |
+| Có tuổi, không rõ giới tính · y90 (%) | 57.46 |
+| Có tuổi, có khai báo giới tính · y90 (%) | 41.10 |
+| Thiếu tuổi, có khai báo giới tính · y90 (%) | 29.93 |
+| Thiếu cả hai thông tin · y90 (%) | 15.79 |
 
 ![profile completeness](figures/profile_completeness.png)
 
-**Quan sát:** thiếu tuổi thường đi cùng tình trạng không rõ giới tính. Chênh lệch ứng dụng vẫn xuất hiện trong nhóm có đủ hai thông tin này.
+**Quan sát:** có tuổi nhưng không rõ giới tính là nhóm có tỷ lệ y90 cao nhất, vượt nhóm có cả hai thông tin. Chênh lệch ứng dụng còn trong nhóm có tuổi và có khai báo giới tính.
 
-**Phạm vi và cách đọc:** bên trái là số người dùng trong bốn ô hồ sơ. Bên phải là nhãn y90 dưới giả định theo dõi 365 ngày, chỉ trong nhóm có tuổi và có khai báo giới tính, với khoảng Wilson 95%. Bảng B11 giữ cả bốn mức đầy đủ hồ sơ. Đây là phân tầng mô tả, chưa kiểm soát mọi khác biệt và chưa xác nhận thông tin có sẵn tại t0.
+**Phạm vi và cách đọc:** cả hai hình dùng y90 dưới giả định theo dõi NDF ít nhất 90 ngày và khoảng Wilson 95%. Bảng B11 giữ cả bốn nhóm giao cờ. Đây là phân tầng mô tả, chưa kiểm soát mọi khác biệt và chưa xác nhận thông tin có sẵn tại t0.
 
 ### Tỷ lệ đặt chỗ và độ bất định theo các nhóm chính
 
@@ -592,15 +650,15 @@ Total variation (TV) đo mức khác nhau giữa hai phân phối của một bi
 
 ## 6. Tổng hợp giới hạn và mức độ phù hợp
 
-Airbnb phù hợp để nghiên cứu xác suất đặt chỗ đầu tiên tại thời điểm đăng ký. Báo cáo phân biệt nhãn y hiện có với nhãn nghiên cứu y90 dưới giả định theo dõi đủ 365 ngày. Nghiên cứu y90 có thể bắt đầu với giả định được công khai và kiểm tra độ nhạy. Việc triển khai còn cần xác minh hồ sơ tại t0 và cơ chế theo dõi NDF.
+Nhãn y90 dùng giả định theo dõi NDF ít nhất 90 ngày. Rủi ro đầu vào được quản lý bằng nhánh chính không dùng tuổi, giới tính hoặc cờ thiếu hồ sơ. Dữ liệu hiện tại chỉ xác nhận trực tiếp mốc tạo tài khoản; mọi mở rộng cần bằng chứng về sự kiện gốc tại t0. Hai cờ hồ sơ và các thuộc tính có thể cập nhật chỉ nằm trong nhánh có điều kiện. Chưa có mô hình nào được chấp nhận hoặc triển khai.
 
 **Giới hạn, mức độ phù hợp và điều kiện sử dụng**
 
 | Tiêu chí | Bằng chứng trong báo cáo | Trạng thái | Điều kiện còn lại |
 | --- | --- | --- | --- |
-| Đủ tín hiệu | 10 category được sàng lọc V; gender V=0.207, trong 2014=0.251; có bảng tương tác/cohort | Đạt ở mức EDA | Kiểm tra giá trị bổ sung so với Logistic Regression mạnh. Các chỉ báo thiếu hồ sơ có liên hệ chồng lặp, không được cộng bằng chứng độc lập. |
+| Đủ tín hiệu | Bốn nhóm giao cờ có tỷ lệ y90 không đơn điệu; chênh lệch ứng dụng còn sau phân tầng. Chưa đo chất lượng ngoài thời gian. | Có giả thuyết để kiểm tra, chưa xác nhận đầu vào tại t0 | Kiểm tra giá trị bổ sung so với Logistic Regression mạnh. Các chỉ báo thiếu hồ sơ có liên hệ chồng lặp, không được cộng bằng chứng độc lập. |
 | Đủ cỡ mẫu | 213,451 users; 88,908 booking; cohort 2014 76,466 | Đạt tổng thể | Một số category/ô tương tác ít user; dùng n và CI PT/AU và các category hiếm có ít quan sát; khác biệt theo giới/tuổi/kênh có thể bị cohort và missing chi phối. |
-| Nhãn tin cậy | Việc có ngày đặt chỗ khớp nhãn y ở 100% trường hợp. Có 29 độ trễ âm và độ trễ tối đa 365 ngày. | Nghiên cứu y90 có điều kiện | Dùng giả định theo dõi 365 ngày và báo độ nhạy. Xác nhận chính thức Q3 trước triển khai; loại 29 ngoại lệ khỏi mẫu y90. |
+| Nhãn tin cậy | Việc có ngày đặt chỗ khớp nhãn y ở 100% trường hợp. Có 29 độ trễ âm và độ trễ tối đa 365 ngày. | Nghiên cứu y90 có điều kiện | Cần theo dõi ít nhất 90 ngày; kiểm tra theo tháng và độ nhạy sai nhãn NDF. Loại 29 ngoại lệ khỏi mẫu y90. |
 | Không rò rỉ | date_first_booking và presence tiết lộ nhãn; sessions chứa tên giao dịch, thiếu timestamp | Chưa đạt với toàn bộ raw | Thiết kế chính loại các nguồn này; cần audit lại trước fit date_first_booking tiết lộ nhãn; log không có timestamp nên chưa xác nhận được cửa sổ trước t0. |
 | Biến khả dụng tại t0 | t0 đã chọn: sau tạo account; raw không cung cấp lịch sử cập nhật hồ sơ | Cần xác minh | Xác nhận snapshot từng biến; ngày account không có giờ |
 | Ổn định theo thời gian | Booking rate/cohort, độ phủ sessions và TV category thay đổi; đã có đối chiếu cùng năm 2014 | Chưa đạt giả định ổn định | Dùng kiểm định theo thời gian, không coi train/test là IID |
@@ -616,7 +674,7 @@ Mỗi hàm ý nối trực tiếp với quan sát EDA và điều kiện dữ li
 
 | Phát hiện | Hàm ý cho bước sau | Điều kiện cần | Bằng chứng trong báo cáo |
 | --- | --- | --- | --- |
-| Độ trễ tập trung trong 90 ngày | Nghiên cứu nhãn y90 dưới giả định theo dõi 365 ngày | Báo độ nhạy theo Q3; xác nhận cơ chế trước triển khai | Bảng mức bao phủ các thời hạn |
+| Độ trễ tập trung trong 90 ngày | Nghiên cứu y90 dưới giả định theo dõi ít nhất 90 ngày | Kiểm tra tháng và độ nhạy sai nhãn NDF trên cùng mẫu người dùng | Bảng mức bao phủ các thời hạn |
 | Cờ thiếu tuổi liên hệ rõ với nhãn y | Đánh giá giá trị bổ sung của tình trạng thiếu hồ sơ | Xác minh tuổi và cờ thiếu tại t0 · Q1 | Bảng độ mạnh liên hệ; bảng tỷ lệ theo nhóm |
 | Chênh lệch theo ứng dụng và kênh vẫn có trong năm 2014 | So sánh Logistic Regression và CatBoost | Đánh giá theo thời gian; không suy ra tác động nhân quả | Bảng phân tầng; bản đồ các nhóm kết hợp |
 | Ngày đặt chỗ tiết lộ hoàn toàn nhãn y | Loại ngày đặt chỗ và cờ thiếu khỏi danh sách đầu vào | Giữ cột để kiểm tra nhãn, độ trễ và Q2 | Bảng chéo ngày đặt chỗ và nhãn y |
@@ -629,97 +687,100 @@ Ba câu hỏi dưới đây cần bằng chứng ngoài CSV. Vai trò phụ trá
 
 Nguồn cần tra cứu gồm [Mô tả dữ liệu](https://www.kaggle.com/competitions/airbnb-recruiting-new-user-bookings/data), [Thảo luận Kaggle](https://www.kaggle.com/competitions/airbnb-recruiting-new-user-bookings/discussion) và hồ sơ của người cung cấp dữ liệu. Lần tra cứu ngày 2026-11-02 chưa đọc được nội dung trang dữ liệu và thảo luận qua công cụ web. Vì vậy, các liên kết này là nguồn có thể trả lời, không được ghi thành bằng chứng đã xác nhận. Chỉ đóng một câu hỏi khi lưu được liên kết hoặc tài liệu, đoạn giải thích liên quan, ngày đối chiếu và người duyệt.
 
-Q3 đã có bằng chứng định lượng mạnh và không còn chặn việc xây dựng nhãn nghiên cứu 90 ngày có điều kiện. Trạng thái chưa xác nhận chính thức chỉ giới hạn mức kết luận và triển khai.
+B15 chưa cho thấy mức bao phủ 90 ngày giảm ở cuối train trong người đã đặt chỗ. Điều này chưa xác nhận theo dõi NDF. Giả định tối thiểu 90 ngày được công khai và B16 định lượng độ nhạy sai nhãn trên cùng mẫu; xác nhận cơ chế vẫn cần trước triển khai.
 
 **Danh mục xác minh và quyết định khi thiếu bằng chứng**
 
 | Câu hỏi | Thông tin cần làm rõ | Nguồn có thể trả lời | Vai trò phụ trách đề xuất | Cách xác minh | Điều kiện kết thúc và quyết định | Trạng thái |
 | --- | --- | --- | --- | --- | --- | --- |
-| Q1 · Hồ sơ tại t0 | Tuổi, tình trạng thiếu tuổi và các thuộc tính khác là dữ liệu lúc đăng ký hay đã cập nhật về sau? | [Mô tả dữ liệu](https://www.kaggle.com/competitions/airbnb-recruiting-new-user-bookings/data); [Thảo luận Kaggle](https://www.kaggle.com/competitions/airbnb-recruiting-new-user-bookings/discussion); mô tả trích xuất của người cung cấp dữ liệu | Tác giả báo cáo tổng hợp; người cung cấp dữ liệu xác nhận cách trích xuất; người hướng dẫn duyệt phạm vi | Đối chiếu từ điển gốc và lịch sử cập nhật hoặc mô tả truy vấn trích xuất cho từng thuộc tính. | Lưu bằng chứng về thời điểm có sẵn của từng cột, gồm cả cờ thiếu. Cột chưa có bằng chứng không được coi là đầu vào hợp lệ tại t0. | Mở · chưa có lịch sử hồ sơ |
+| Q1 · Hồ sơ tại t0 | Tuổi, tình trạng thiếu tuổi và các thuộc tính khác là dữ liệu lúc đăng ký hay đã cập nhật về sau? | [Mô tả dữ liệu](https://www.kaggle.com/competitions/airbnb-recruiting-new-user-bookings/data); [Thảo luận Kaggle](https://www.kaggle.com/competitions/airbnb-recruiting-new-user-bookings/discussion); mô tả trích xuất của người cung cấp dữ liệu | Tác giả báo cáo tổng hợp; người cung cấp dữ liệu xác nhận cách trích xuất; người hướng dẫn duyệt phạm vi | Đối chiếu B12–B14 về luồng đăng ký, độ mới của nhóm train/test và ứng viên cập nhật hồ sơ. Đây là kiểm tra gián tiếp; để đóng Q1 cần lịch sử hồ sơ hoặc tài liệu sự kiện xác nhận từng giá trị có trước t0. | Nhánh chính không dùng hai cờ hồ sơ. Nhánh có tuổi/giới tính/cờ chỉ được fit sau khi có bằng chứng Q1. Mọi cột khác cũng cần kiểm tra khả dụng; không suy từ tên cột thành bằng chứng đã xác nhận. | Mở · chưa có lịch sử hồ sơ |
 | Q2 · 29 ngoại lệ ngày đặt chỗ | Vì sao ngày đặt chỗ có trước ngày tạo tài khoản? | [Mô tả dữ liệu](https://www.kaggle.com/competitions/airbnb-recruiting-new-user-bookings/data); [Thảo luận Kaggle](https://www.kaggle.com/competitions/airbnb-recruiting-new-user-bookings/discussion); giải thích các mốc thời gian từ người cung cấp dữ liệu | Tác giả báo cáo kiểm tra tổng hợp; người cung cấp dữ liệu giải thích; người hướng dẫn duyệt quy tắc xử lý | Đối chiếu ngày hoạt động đầu tiên, quy ước múi giờ, định nghĩa tạo tài khoản và sự kiện đặt chỗ. Lưu bảng kiểm tra tổng hợp, không công bố định danh. | Có giải thích được dẫn nguồn và quyết định giữ hoặc loại có người duyệt. Trong EDA vẫn giữ nguyên dữ liệu và báo riêng 29 trường hợp. | Mở · chưa giải thích được ngoại lệ |
-| Q3 · Kết thúc theo dõi | Nhãn y=0 đã được theo dõi đến ngày nào, và vì sao độ trễ lớn nhất là 365 ngày? | [Mô tả dữ liệu](https://www.kaggle.com/competitions/airbnb-recruiting-new-user-bookings/data); [Thảo luận Kaggle](https://www.kaggle.com/competitions/airbnb-recruiting-new-user-bookings/discussion); quy trình tạo nhãn và ngày kết thúc theo dõi từ người cung cấp dữ liệu | Tác giả báo cáo tổng hợp; người cung cấp dữ liệu xác nhận quy trình tạo nhãn; người hướng dẫn duyệt bài toán | Đối chiếu giới hạn 365 ngày ở mọi nhóm năm và mốc booking cuối. Nghiên cứu dùng giả định theo dõi đủ 365 ngày; đồng thời tìm tài liệu xác nhận NDF thực sự được theo dõi đủ thời hạn. | Cho phép nghiên cứu nhãn y90 có điều kiện ngay; trước triển khai phải lưu xác nhận chính thức cơ chế theo dõi. Báo cả kịch bản bỏ giả định NDF và loại ngoại lệ ngày âm. | Giả thuyết được dữ liệu ủng hộ; đã dùng làm giả định nghiên cứu, chưa xác nhận chính thức |
+| Q3 · Kết thúc theo dõi | Nhãn y=0 đã được theo dõi đến ngày nào, và vì sao độ trễ lớn nhất là 365 ngày? | [Mô tả dữ liệu](https://www.kaggle.com/competitions/airbnb-recruiting-new-user-bookings/data); [Thảo luận Kaggle](https://www.kaggle.com/competitions/airbnb-recruiting-new-user-bookings/discussion); quy trình tạo nhãn và ngày kết thúc theo dõi từ người cung cấp dữ liệu | Tác giả báo cáo tổng hợp; người cung cấp dữ liệu xác nhận quy trình tạo nhãn; người hướng dẫn duyệt bài toán | Đối chiếu B15 theo tháng và mốc lịch giả định; tìm tài liệu xác nhận NDF được theo dõi ít nhất 90 ngày. Không yêu cầu mọi người đủ 365 ngày. | Cho phép nghiên cứu có điều kiện trên giả định tối thiểu 90 ngày; trước triển khai phải xác nhận cơ chế theo dõi. Độ nhạy B16 giữ nguyên mẫu người dùng, không chọn riêng người đã đặt chỗ. | Giả thuyết được dữ liệu ủng hộ; đã dùng làm giả định nghiên cứu, chưa xác nhận chính thức |
 
 ## 7. Thuật toán và thiết kế đánh giá đề xuất
 
 ### Baseline, mô hình chính và xác suất
 
-Thiết kế mô hình dùng nhãn y90 có điều kiện dưới giả định theo dõi đủ 365 ngày. Xác suất hằng chỉ là mốc kiểm tra tối thiểu. Đối chứng quyết định giá trị của CatBoost là Logistic Regression L2 mạnh, gồm một cấu hình ít biến và một cấu hình có cùng đầu vào với CatBoost. Baseline LR được chọn bằng các lượt kiểm định có khoảng đệm, trước khi dùng tập cuối.
+Thiết kế tách tính hợp lệ của đầu vào khỏi độ mạnh liên hệ. Nhánh chính A0 không phụ thuộc hồ sơ và hai cờ thiếu. A1 chỉ mở rộng bằng thông tin sự kiện đăng ký được xác nhận; B và C là nhánh có điều kiện. Không thể gọi một cột chắc chắn có tại t0 chỉ vì tên cột gợi ý như vậy. Mọi kết quả của B khi Q1 còn mở chỉ là phân tích mô tả, không thay thế đối chứng của A0/A1.
 
-Hai cờ hồ sơ có liên hệ mạnh nên cần kiểm tra loại lần lượt cờ thiếu tuổi, cờ không rõ giới tính, rồi ứng dụng đăng ký. Mọi xử lý thiếu, mã hóa và thống kê dựa nhãn chỉ học trên tập học. Chưa huấn luyện mô hình, tính AUC hoặc tối ưu tham số trong báo cáo này.
+Trong mỗi nhánh hợp lệ, so sánh xác suất hằng, LR có hiệu ứng chính, LR có tương tác cặp và CatBoost. Các cặp ứng dụng × cờ và ứng dụng × kênh giúp LR biểu diễn chênh lệch đã thấy ở B11. Mã hóa cặp, xử lý nhóm hiếm và điều chuẩn L2 chỉ học/chọn trên lịch sử phát triển. Nếu one-hot giới tính đã chứa chỉ báo unknown thì không thêm một cột trùng hệt. CatBoost được so với LR tốt nhất trên cùng thông tin và cùng lịch đánh giá, không chỉ LR thiếu tương tác.
 
-Bảng entropy bên dưới tính từ tỷ lệ của hai nhóm tuổi trên chính mẫu năm 2014. Đây là phép tính mô tả cùng mẫu, có xu hướng lạc quan, không phải log loss kiểm định hoặc kết quả mô hình. Lift top 20% là kỳ vọng khi chọn ngẫu nhiên trong nhóm có tỷ lệ cao nhất, vì nhóm đó lớn hơn 20% mẫu. Nó cho thấy ngưỡng cũ so với xác suất hằng dễ đạt, nhưng không chứng minh một mô hình đã đạt ngoài thời gian.
+Chưa huấn luyện hoặc ước lượng chất lượng mô hình trong báo cáo. Phân tích entropy từ cờ hồ sơ được chuyển xuống phụ lục; nó không định nghĩa nhánh chính hoặc xác nhận tính khả dụng tại t0.
 
-**Đối chứng từ đơn giản đến mạnh và so sánh công bằng**
+**B17 · Các nhánh đầu vào và điều kiện tại t0**
+
+| Nhánh | Thông tin | Căn cứ và điều kiện | Trạng thái hiện tại |
+| --- | --- | --- | --- |
+| A0 · Nhánh chính tối thiểu | Ngày tạo tài khoản; các thông tin lịch suy ra từ t0 | Mốc tạo tài khoản có ngay khi sự kiện hoàn tất. Không dùng tuổi, giới tính, cờ thiếu, kênh hay nhật ký. | Có thể đặc tả độc lập với Q1; chưa huấn luyện |
+| A1 · Mở rộng sự kiện đăng ký | Cách đăng ký, luồng đăng ký, ứng dụng đăng ký | Chỉ mở khi tài liệu hoặc hợp đồng dữ liệu xác nhận chúng được ghi tại sự kiện tạo tài khoản. CSV và tên cột chưa đủ chứng minh lịch sử bất biến. | Chờ kiểm tra nguồn; nếu chưa xác nhận thì giữ A0 |
+| B · Hồ sơ có điều kiện | Tuổi, giới tính, hai cờ thiếu và các tương tác liên quan | Q1 là điều kiện chặn. Cần lịch sử hoặc mô tả trích xuất xác nhận tại t0. Các bảng gián tiếp chưa đáp ứng điều kiện này. | Không dùng trong nhánh chính khi Q1 còn mở |
+| C · Kênh/thiết bị có điều kiện | Kênh tiếp cận, nhà cung cấp, thiết bị và các thuộc tính khác | Chỉ thêm từng cột có bằng chứng tại t0; không mặc định mọi hồ sơ thô là thông tin đăng ký. | Khai báo rõ danh sách cột được chấp nhận trước mỗi thí nghiệm |
+
+**Đối chứng có tương tác trong từng nhánh hợp lệ**
 
 | Ứng viên | Thông tin sử dụng | Vai trò và kiểm soát |
 | --- | --- | --- |
-| Xác suất hằng | Tỷ lệ y90 trong mỗi tập học | Chỉ là mốc kiểm tra cơ bản |
-| Logistic Regression L2 · hồ sơ tối giản | Cờ thiếu tuổi và cờ không rõ giới tính | Đo mức tín hiệu dễ khai thác; kiểm tra bỏ lần lượt từng cờ |
-| Logistic Regression L2 · ít biến mạnh | Hai cờ hồ sơ, ứng dụng đăng ký, kênh tiếp cận, cách đăng ký | Baseline mạnh bắt buộc; mã hóa và chọn điều chuẩn trong tập học/kiểm định |
-| Logistic Regression L2 · cùng đầu vào | Cùng tập biến hợp lệ tại t0 với CatBoost | So sánh công bằng về nguồn thông tin; baseline chính là LR tốt nhất được chọn trên các lượt kiểm định |
-| CatBoost | Cùng thông tin hợp lệ tại t0 | Chỉ chấp nhận nếu tăng giá trị so với LR đã chọn; kiểm tra bỏ cờ hồ sơ và ứng dụng |
-| Hiệu chỉnh sigmoid | Áp dụng riêng cho từng ứng viên đã cố định | Cùng cửa sổ hiệu chỉnh, cùng cửa sổ đánh giá; không ưu tiên riêng CatBoost |
-
-**Đối chiếu mô tả: mức tín hiệu chỉ từ tình trạng thiếu tuổi**
-
-| Mục tiêu | Số người dùng · 2014 | Entropy xác suất hằng | Entropy theo hai nhóm tuổi | Giảm entropy cùng mẫu (%) | Lift kỳ vọng top 20% cùng mẫu |
-| --- | --- | --- | --- | --- | --- |
-| Nhãn y hiện có | 76,466 | 0.6652 | 0.5919 | 11.0149 | 1.4264 |
-| Nhãn y90 · giả định 365 ngày | 76,466 | 0.6239 | 0.5789 | 7.2188 | 1.3875 |
+| Xác suất hằng | Tỷ lệ y90 trong tập học tại mốc tháng | Đối chứng cơ bản trong mỗi nhánh |
+| LR L2 · hiệu ứng chính | Chỉ các cột đã được chấp nhận của nhánh | Không dùng hai cờ để định nghĩa baseline chính khi Q1 chưa đóng |
+| LR L2 · tương tác cặp | Các cột trên và one-hot cặp nhóm được chấp nhận | A1: ứng dụng × cách/luồng đăng ký; B: cờ × ứng dụng, cờ × cờ; C: ứng dụng × kênh. Chỉ tạo cặp khi cả hai cột hợp lệ tại t0. |
+| CatBoost | Cùng nguồn thông tin được chấp nhận với LR | Phải so với LR tốt nhất gồm cả cấu hình có tương tác; chọn bằng các tháng phát triển |
+| Hiệu chỉnh sigmoid từ OOF theo thời gian | Dự đoán lịch sử ngoài tập học, có nhãn đã hoàn tất tại mốc hiện tại | Áp dụng cùng quy trình cho LR và CatBoost; không hiệu chỉnh bằng dự đoán trong mẫu |
 
 ### Chia theo thời gian và kiểm soát đánh giá
 
-Bảng B7 dùng nhãn y90 và có khoảng đệm 90 ngày lịch trước mỗi cửa sổ kiểm định, trước hiệu chỉnh và giữa hiệu chỉnh với đánh giá cuối. Ngày thứ 90 được tính vào nhãn. Vì CSV chỉ chính xác đến ngày, nhãn chỉ được dùng khi ngày đăng ký + 90 ngày nhỏ hơn mốc dự đoán. Cột ngày nhãn sẵn có tương ứng ngày đăng ký cuối + 91 ngày.
+B7 thay các cửa sổ không đều bằng mốc dự đoán đầu mỗi tháng. Sáu tháng 7–12/2013 phục vụ phát triển; các nhãn này đã hoàn tất trước khi chốt cấu hình vào 2014-05-01. Hai tháng 5 và 6/2014 là các lượt đánh giá cuối. Báo điểm từng tháng và điểm gộp theo số người; không để một cửa sổ nhỏ riêng quyết định mô hình.
 
-Ba lượt kiểm định kết thúc ở các nhóm đăng ký tháng 1–3/2013, tháng 7–8/2013 và tháng 9 đến 2013-10-02. Nhãn của lượt cuối sẵn có từ 2014-01-01. Khi đó chốt cấu hình và huấn luyện lại với người đăng ký đến 2013-10-02. Hiệu chỉnh dùng người đăng ký từ 2014-01-01 đến 2014-01-30. Nhãn hiệu chỉnh hoàn tất trước mốc đánh giá 2014-05-01; ngày đăng ký 2014-01-31 đến 2014-04-30 nằm trong khoảng đệm.
+Tại mốc O, học lại trên mọi người có nhãn hợp lệ và ngày đăng ký + 90 ngày < O. Vì nhãn gồm ngày thứ 90 và CSV chỉ ghi ngày, thời điểm sẵn có là ngày đăng ký + 91 ngày. Tại 2014-05-01, dùng dữ liệu đăng ký đến 2014-01-30; tại 2014-06-01, dùng đến 2014-03-02. Chỉ người chưa hoàn tất nhãn bị loại khỏi tập học. Không giữ thêm khoảng đệm riêng giữa tập học cuối và dữ liệu hiệu chỉnh.
 
-Đánh giá cuối dùng người đăng ký tháng 5–6/2014 và chỉ tính kết quả sau khi nhãn hoàn tất từ 2014-09-29. Không đưa người trong khoảng đệm vào tập trước, kể cả người đã đặt chỗ sớm, để tránh chọn mẫu theo kết quả. Các số lượng chỉ là kiểm kê cửa sổ trên mẫu y90 hợp lệ, chưa xuất tập chia hoặc huấn luyện.
+Hiệu chỉnh dùng dự đoán OOF theo thời gian của các nhóm đăng ký trong 90 ngày gần nhất đã hoàn tất nhãn tại O. Mỗi dự đoán OOF phải được tạo bởi mô hình chỉ học các nhãn đã có trước đầu tháng đăng ký của chính người đó; người đó không thuộc tập học tạo dự đoán. Bộ hiệu chỉnh sigmoid học trên các dự đoán lịch sử này, rồi áp dụng cho mô hình nền được học lại trên toàn bộ nhãn đã hoàn tất tại O. Nhãn hiệu chỉnh có thể nằm trong tập học của mô hình nền cuối; điều bắt buộc là điểm dùng học bộ hiệu chỉnh phải là OOF. Đây là thiết kế đề xuất, chưa sinh dự đoán OOF hay fit bộ hiệu chỉnh.
 
-[TimeSeriesSplit của scikit-learn](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.TimeSeriesSplit.html) có tham số gap tính theo số dòng. Thiết kế ở đây dùng ngày lịch vì số người đăng ký mỗi ngày không đều. Khoảng đệm bảo đảm thứ tự nhãn theo giả định đã nêu; mọi độ trễ cập nhật dữ liệu thực tế cần được cộng thêm khi có bằng chứng.
+Độ dài cửa sổ, dạng tương tác, điều chuẩn và phương pháp hiệu chỉnh được chốt bằng các tháng phát triển trước 2014-05-01. Tháng 6 chỉ học lại với nhãn mới đã hoàn tất, không chỉnh cấu hình theo kết quả cuối tháng 5. Khi dự đoán tháng 6, nhãn tháng 5 chưa hoàn tất nên không được dùng. Cần kiểm tra sự chuyển đổi từ điểm OOF của mô hình cũ sang mô hình học lại trong các tháng phát triển; không giả định hiệu chỉnh tự chuyển giao hoàn hảo.
 
-**B7 · Cửa sổ thời gian đề xuất và quy mô quan sát**
+[Tài liệu hiệu chỉnh của scikit-learn](https://scikit-learn.org/stable/modules/calibration.html) mô tả dùng dự đoán ngoài tập học để học bộ hiệu chỉnh. Ở đây việc tạo điểm ngoài tập học phải tuân thủ mốc thời gian và độ trễ nhãn, thay vì chia ngẫu nhiên. Toàn bộ chất lượng và ngưỡng dưới đây còn phải được đo sau khi huấn luyện.
 
-| Mục đích đề xuất | Đăng ký từ ngày | Đăng ký đến ngày | Số người dùng | Mẫu hợp lệ y90 | Số có nhãn y90=1 | Tỷ lệ y90=1 (%) | Mốc dự đoán | Ngày nhãn cửa sổ sẵn có | Vai trò | Đệm từ ngày | Đệm đến ngày | Đệm (ngày lịch) |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Lượt 1 · học | 2010-01-01 | 2012-10-02 | 43,308 | 43,282 | 18,370 | 42.4426 | 2013-01-01 | 2013-01-01 | học | 2012-10-03 | 2012-12-31 | 90 |
-| Lượt 1 · kiểm định | 2013-01-01 | 2013-03-31 | 14,201 | 14,200 | 5,211 | 36.6972 | 2013-01-01 | 2013-06-30 | kiểm định | — | — | 0 |
-| Lượt 2 · học | 2010-01-01 | 2013-04-01 | 68,434 | 68,405 | 27,252 | 39.8392 | 2013-07-01 | 2013-07-01 | học | 2013-04-02 | 2013-06-30 | 90 |
-| Lượt 2 · kiểm định | 2013-07-01 | 2013-08-31 | 16,319 | 16,319 | 5,703 | 34.947 | 2013-07-01 | 2013-11-30 | kiểm định | — | — | 0 |
-| Lượt 3 · học | 2010-01-01 | 2013-06-02 | 81,150 | 81,121 | 31,877 | 39.2956 | 2013-09-01 | 2013-09-01 | học | 2013-06-03 | 2013-08-31 | 90 |
-| Lượt 3 · kiểm định | 2013-09-01 | 2013-10-02 | 9,833 | 9,833 | 2,928 | 29.7773 | 2013-09-01 | 2014-01-01 | kiểm định | — | — | 0 |
-| Huấn luyện lại | 2010-01-01 | 2013-10-02 | 113,719 | 113,690 | 42,836 | 37.6779 | 2014-01-01 | 2014-01-01 | học | 2013-10-03 | 2013-12-31 | 90 |
-| Hiệu chỉnh xác suất | 2014-01-01 | 2014-01-30 | 10,774 | 10,774 | 3,248 | 30.1466 | 2014-01-01 | 2014-05-01 | hiệu chỉnh | 2014-01-31 | 2014-04-30 | 90 |
-| Đánh giá cuối | 2014-05-01 | 2014-06-30 | 30,641 | 30,641 | 9,712 | 31.6961 | 2014-05-01 | 2014-09-29 | đánh giá | — | — | 0 |
+**B7 · Các mốc tháng, lịch sử có nhãn và quy mô đánh giá**
+
+| Mốc dự đoán | Vai trò | Đăng ký học đến | Mẫu học hợp lệ | Mẫu đánh giá | Dương tính đánh giá | Tỷ lệ y90 đánh giá (%) | Ngày nhãn cửa sổ sẵn có |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2013-07-01 | phát triển | 2013-04-01 | 68,405 | 7,950 | 2,823 | 35.5094 | 2013-10-30 |
+| 2013-08-01 | phát triển | 2013-05-02 | 74,484 | 8,369 | 2,880 | 34.4127 | 2013-11-30 |
+| 2013-09-01 | phát triển | 2013-06-02 | 81,121 | 9,125 | 2,694 | 29.5233 | 2013-12-30 |
+| 2013-10-01 | phát triển | 2013-07-02 | 88,125 | 7,862 | 2,560 | 32.5617 | 2014-01-30 |
+| 2013-11-01 | phát triển | 2013-08-02 | 96,037 | 7,751 | 2,324 | 29.9832 | 2014-03-01 |
+| 2013-12-01 | phát triển | 2013-09-01 | 104,049 | 8,361 | 2,368 | 28.322 | 2014-04-01 |
+| 2014-05-01 | đánh giá cuối | 2014-01-30 | 147,730 | 14,895 | 4,793 | 32.1786 | 2014-08-30 |
+| 2014-06-01 | đánh giá cuối | 2014-03-02 | 158,666 | 15,746 | 4,919 | 31.2397 | 2014-09-29 |
 
 **Vai trò từng giai đoạn huấn luyện, hiệu chỉnh và đánh giá**
 
 | Giai đoạn | Cửa sổ | Thời điểm và điều kiện sử dụng |
 | --- | --- | --- |
-| Chọn cấu hình | Ba lượt kiểm định trong năm 2013 | Nhãn lượt cuối sẵn có từ 2014-01-01; lúc đó mới chốt mô hình và LR đối chứng |
-| Huấn luyện lại | Người đăng ký đến 2013-10-02 | Đệm 2013-10-03 đến 2013-12-31; dự đoán hiệu chỉnh từ 2014-01-01 |
-| Hiệu chỉnh | Người đăng ký 2014-01-01 đến 2014-01-30 | Đệm 2014-01-31 đến 2014-04-30; mô hình nền giữ cố định |
-| Đánh giá cuối | Người đăng ký 2014-05-01 đến 2014-06-30 | Mô hình và bộ hiệu chỉnh cố định trước 2014-05-01; kết quả hoàn tất từ 2014-09-29 |
+| Chọn cấu hình | Mốc đầu tháng 7–12/2013 | Tổng hợp mọi tháng phát triển đã hoàn tất nhãn; chốt cấu hình, nhánh đầu vào và quy trình hiệu chỉnh trước 2014-05-01 |
+| Học lại tại từng mốc | 2014-05-01 và 2014-06-01 | Dùng toàn bộ nhãn hợp lệ đã hoàn tất: đăng ký đến 2014-01-30 và 2014-03-02 tương ứng |
+| Hiệu chỉnh tại từng mốc | Các nhóm đăng ký trong 90 ngày gần nhất đã hoàn tất nhãn | Học từ dự đoán lịch sử OOF theo thời gian. Không cần chia thêm khoảng đệm giữa mẫu này và tập học nền cuối; không dùng điểm dự đoán trong mẫu. |
+| Đánh giá cuối | Tháng 5 và tháng 6/2014 | Chỉ cập nhật trọng số mô hình và bộ hiệu chỉnh bằng lịch sử có sẵn; không đổi cấu hình theo kết quả đánh giá cuối |
 | Test Kaggle | Người đăng ký tháng 7–9/2014 | Chỉ kiểm tra cấu trúc và thay đổi phân phối vì không có nhãn |
 
 ![evaluation timeline](figures/evaluation_timeline.png)
 
-**Quan sát:** mỗi tập học cách tập kiểm định hoặc hiệu chỉnh một khoảng đệm 90 ngày. Hiệu chỉnh dùng người đăng ký 2014-01-01 đến 2014-01-30, rồi chờ đến 2014-05-01 mới bắt đầu đánh giá cuối.
+**Quan sát:** tại mỗi mốc tháng, tập học mở rộng đến mọi nhãn đã hoàn tất. Tháng 5/2014 học đến 2014-01-30, tháng 6/2014 học đến 2014-03-02.
 
-**Phạm vi và cách đọc:** thanh màu là cửa sổ ngày đăng ký; vùng gạch là khoảng đệm không đưa vào tập trước. Cỡ mẫu loại ngoại lệ chưa gán y90. Ngày nhãn sẵn có dùng quy tắc ngày đăng ký cuối + 91, tương đương ngày thứ 90 hoàn tất trước mốc dự đoán. Toàn bộ nhãn y90 vẫn có điều kiện trên giả định theo dõi đủ 365 ngày.
+**Phạm vi và cách đọc:** vùng xanh là lịch sử có nhãn; gạch chéo là người chưa hoàn tất nhãn tại mốc dự đoán. Khung cam chỉ mẫu nhãn dùng học bộ hiệu chỉnh từ dự đoán OOF lịch sử, nằm trong tập học nền cuối. Việc trùng nhãn lịch sử chỉ hợp lệ khi điểm học bộ hiệu chỉnh là OOF theo thời gian. Đây là đặc tả đề xuất, chưa có dự đoán hoặc mô hình.
 
 ### Tiêu chí chấp nhận đặt trước
 
-Các ngưỡng dưới đây là đề xuất đặt trước cho giá trị bổ sung của CatBoost so với Logistic Regression mạnh. Chúng không phải kết quả đã đo hoặc chuẩn phổ quát. Thay đổi đối chứng là điểm chính; chỉ tăng một ngưỡng so với xác suất hằng vẫn chưa đủ. Mức giảm log loss 2% so với hằng và lift tuyệt đối 1.20 của bản trước không còn dùng để chấp nhận CatBoost. Chọn LR đối chứng và bộ tham số bằng dữ liệu phát triển, không chọn theo tập cuối.
+Trước tiên, mọi ứng viên phải qua điều kiện t0, thứ tự nhãn và chuẩn xác suất tuyệt đối. Sau đó mới xét giá trị bổ sung của CatBoost so với LR tốt nhất, gồm cả LR có tương tác, trong cùng nhánh hợp lệ. Nếu CatBoost không đạt, LR chỉ được dùng khi chính LR qua các điều kiện bắt buộc. Nếu không ứng viên nào đạt thì báo chưa có mô hình được chấp nhận. Các ngưỡng là đề xuất đặt trước, chưa phải kết quả đã đo hoặc chuẩn phổ quát.
 
 **Điều kiện để CatBoost được chấp nhận thay cho LR**
 
 | Tiêu chí | Điều kiện chấp nhận đề xuất | Cách diễn giải |
 | --- | --- | --- |
-| Toàn vẹn và thời gian | 0 ID giao nhau trong mỗi lượt; ngày đăng ký + 90 < mốc dự đoán cho mọi nhãn dùng học; loại 29 ngoại lệ khỏi y90 | Kiểm tra cả học, hiệu chỉnh và thời điểm chọn cấu hình |
+| Toàn vẹn và khả dụng · điều kiện chặn | 0 biến kết quả hoặc log chưa chứng minh trước t0; 0 thuộc tính/cờ chưa có bằng chứng tại t0 trong nhánh được fit; 0 ID giao giữa học và tháng dự đoán | Q1 chưa đóng thì nhánh B không được fit hoặc dùng để thay thế nhánh chính. Chặn cả LR và CatBoost nếu vi phạm. |
+| Thứ tự nhãn và hiệu chỉnh | Mọi nhãn dùng học hoặc hiệu chỉnh phải hoàn tất trước O; mọi điểm học bộ hiệu chỉnh phải là OOF theo thời gian | Loại 29 ngoại lệ khỏi y90; dùng toàn bộ nhãn hợp lệ đã hoàn tất, không chọn theo việc đặt chỗ sớm |
+| Xác suất · chuẩn bắt buộc cho mọi mô hình | Sai lệch tuyệt đối giữa xác suất trung bình và tỷ lệ y90 ≤2 điểm phần trăm; ECE 10 nhóm đồng số mẫu ≤3 điểm phần trăm | Áp dụng cho cả LR lẫn CatBoost sau hiệu chỉnh, trên từng tháng cuối n≥100 và tập gộp. Báo khoảng tin cậy và biểu đồ độ tin cậy. Nếu cả hai không đạt thì chưa có mô hình được chấp nhận. |
 | Giá trị bổ sung · tiêu chí chính | Log loss CatBoost giảm ít nhất 1% tương đối so với baseline LR mạnh đã chọn; cận trên 95% của chênh log loss (CatBoost − LR) < 0 | So sánh ghép cặp trên cùng người, cùng mẫu y90 và cùng hiệu chỉnh; bootstrap theo người dùng |
 | Ưu tiên top 20% | Lift@20% tăng ít nhất 5% tương đối so với LR; cận dưới 95% của chênh lift > 0 | Ngân sách 20% và mức 5% là đề xuất nghiên cứu; ngưỡng tuyệt đối 1.20 chỉ còn là thông tin tham khảo |
 | Phân biệt và xác suất | AP không thấp hơn LR trên điểm ước lượng; báo ROC-AUC, Brier và độ hiệu chỉnh cho cả hai | Brier không kém LR quá 0.002 tuyệt đối; báo khoảng tin cậy của chênh lệch |
-| Hiệu chỉnh | Báo sai lệch xác suất trung bình, ECE 10 nhóm đồng số mẫu và biểu đồ độ tin cậy cho cả LR và CatBoost | Không lấy riêng log loss hoặc ECE làm bằng chứng đầy đủ về hiệu chỉnh |
 | Độ bền và chồng lặp tín hiệu | Báo chênh log loss với LR trong từng tháng và từng nhóm đủ/thiếu hồ sơ; kiểm tra bỏ từng cờ và ứng dụng | Nếu giá trị bổ sung không ổn định hoặc không đạt, ưu tiên LR đơn giản hơn |
 
 ## Phụ lục — từ điển và bảng bổ sung
@@ -1585,15 +1646,15 @@ Bảng bao phủ toàn bộ cột của bốn loại bảng gốc. Đây là quy
 | Hồ sơ người dùng | date_account_created | Ngày tạo tài khoản | Mốc thời gian | Dùng kiểm tra và chia thời gian; cân nhắc đầu vào riêng | Xác minh độ chính xác, múi giờ và thời điểm có sẵn · Q1 |
 | Hồ sơ người dùng | timestamp_first_active | Thời điểm hoạt động đầu tiên | Mốc thời gian | Dùng kiểm tra và chia thời gian; cân nhắc đầu vào riêng | Xác minh độ chính xác, múi giờ và thời điểm có sẵn · Q1 |
 | Hồ sơ người dùng | date_first_booking | Ngày đặt chỗ đầu tiên | Kết quả và kiểm tra thời gian | Loại ngày và cờ thiếu khỏi đầu vào | Giải thích 29 ngoại lệ · Q2 |
-| Hồ sơ người dùng | gender | Giới tính khai báo | Thuộc tính đăng ký | Ứng viên có điều kiện | Xác minh hồ sơ tại t0 · Q1; xử lý thiếu và nhóm mới trong từng tập train |
-| Hồ sơ người dùng | age | Tuổi khai báo | Thuộc tính hồ sơ | Ứng viên có điều kiện; tuổi và cờ thiếu cần cùng được kiểm tra | Xác minh hồ sơ tại t0 và ý nghĩa giá trị ngoài dải · Q1 |
-| Hồ sơ người dùng | signup_method | Cách đăng ký | Thuộc tính đăng ký | Ứng viên có điều kiện | Xác minh hồ sơ tại t0 · Q1; xử lý thiếu và nhóm mới trong từng tập train |
-| Hồ sơ người dùng | signup_flow | Luồng đăng ký | Mã phân loại | Ứng viên có điều kiện; không coi là đại lượng liên tục | Xác minh thời điểm có sẵn · Q1; mã hóa chỉ học trên train |
+| Hồ sơ người dùng | gender | Giới tính khai báo | Thuộc tính đăng ký | Ngoài nhánh chính; chỉ nhánh B sau xác nhận Q1, gồm cả cờ thiếu | Xác minh hồ sơ tại t0 · Q1; xử lý thiếu và nhóm mới trong từng tập train |
+| Hồ sơ người dùng | age | Tuổi khai báo | Thuộc tính hồ sơ | Ngoài nhánh chính; chỉ nhánh B sau xác nhận Q1, gồm cả cờ thiếu | Xác minh hồ sơ tại t0 và ý nghĩa giá trị ngoài dải · Q1 |
+| Hồ sơ người dùng | signup_method | Cách đăng ký | Thuộc tính đăng ký | Nhánh A1 chỉ sau bằng chứng của sự kiện đăng ký; hiện chưa xác nhận từ CSV | Xác minh hồ sơ tại t0 · Q1; xử lý thiếu và nhóm mới trong từng tập train |
+| Hồ sơ người dùng | signup_flow | Luồng đăng ký | Mã phân loại | Nhánh A1 chỉ sau bằng chứng của sự kiện đăng ký; hiện chưa xác nhận từ CSV | Xác minh thời điểm có sẵn · Q1; mã hóa chỉ học trên train |
 | Hồ sơ người dùng | language | Ngôn ngữ | Thuộc tính đăng ký | Ứng viên có điều kiện | Xác minh hồ sơ tại t0 · Q1; xử lý thiếu và nhóm mới trong từng tập train |
 | Hồ sơ người dùng | affiliate_channel | Kênh tiếp cận | Thuộc tính đăng ký | Ứng viên có điều kiện | Xác minh hồ sơ tại t0 · Q1; xử lý thiếu và nhóm mới trong từng tập train |
 | Hồ sơ người dùng | affiliate_provider | Nhà cung cấp tiếp cận | Thuộc tính đăng ký | Ứng viên có điều kiện | Xác minh hồ sơ tại t0 · Q1; xử lý thiếu và nhóm mới trong từng tập train |
 | Hồ sơ người dùng | first_affiliate_tracked | Tương tác tiếp cận đầu tiên | Thuộc tính đăng ký | Ứng viên có điều kiện | Xác minh hồ sơ tại t0 · Q1; xử lý thiếu và nhóm mới trong từng tập train |
-| Hồ sơ người dùng | signup_app | Ứng dụng đăng ký | Thuộc tính đăng ký | Ứng viên có điều kiện | Xác minh hồ sơ tại t0 · Q1; xử lý thiếu và nhóm mới trong từng tập train |
+| Hồ sơ người dùng | signup_app | Ứng dụng đăng ký | Thuộc tính đăng ký | Nhánh A1 chỉ sau bằng chứng của sự kiện đăng ký; hiện chưa xác nhận từ CSV | Xác minh hồ sơ tại t0 · Q1; xử lý thiếu và nhóm mới trong từng tập train |
 | Hồ sơ người dùng | first_device_type | Thiết bị đầu tiên | Thuộc tính đăng ký | Ứng viên có điều kiện | Xác minh hồ sơ tại t0 · Q1; xử lý thiếu và nhóm mới trong từng tập train |
 | Hồ sơ người dùng | first_browser | Trình duyệt đầu tiên | Thuộc tính đăng ký | Ứng viên có điều kiện | Xác minh hồ sơ tại t0 · Q1; xử lý thiếu và nhóm mới trong từng tập train |
 | Hồ sơ người dùng | country_destination | Điểm đến ghi nhận | Cột xác định nhãn y | Chỉ dùng tạo nhãn và đánh giá | Xác minh phạm vi theo dõi · Q3 |
@@ -1616,7 +1677,7 @@ Bảng bao phủ toàn bộ cột của bốn loại bảng gốc. Đây là quy
 | Dân số theo tuổi và giới tính | population_in_thousands | population in thousands | Thuộc tính tổng hợp hoặc khóa bảng phụ | Dùng làm bối cảnh; chưa ghép làm đầu vào | Không ghép bằng điểm đến thật. Cần khóa biết tại t0 và căn cứ sử dụng bảng phụ. |
 | Dân số theo tuổi và giới tính | year | year | Thuộc tính tổng hợp hoặc khóa bảng phụ | Dùng làm bối cảnh; chưa ghép làm đầu vào | Không ghép bằng điểm đến thật. Cần khóa biết tại t0 và căn cứ sử dụng bảng phụ. |
 
-### Chi tiết phân tầng theo độ đầy đủ hồ sơ
+### Chi tiết phân tầng theo giao hai cờ hồ sơ
 
 Mỗi hàng dùng người đăng ký năm 2014 trong nhóm tương ứng. Nhãn y và y90 là hai mục tiêu khác nhau. Các bảng giữ cỡ mẫu và khoảng Wilson của y90.
 
@@ -1645,7 +1706,7 @@ Mỗi hàng dùng người đăng ký năm 2014 trong nhóm tương ứng. Nhãn
 | 1 | 0 | 1,507 | 32.714 | 1,507 | 451 | 29.927 | 27.6684 | 32.2877 | 0 |
 | 1 | 1 | 32,621 | 17.3293 | 32,621 | 5,151 | 15.7904 | 15.3988 | 16.1902 | 0 |
 
-**B11 · Ứng dụng trong từng mức độ đầy đủ hồ sơ**
+**B11 · Ứng dụng trong từng nhóm giao hai cờ hồ sơ**
 
 | Năm đăng ký | Thiếu tuổi | Không rõ giới tính | Ứng dụng đăng ký | Số người dùng | Tỷ lệ nhãn y=1 (%) | Mẫu hợp lệ y90 | Số có nhãn y90=1 | Tỷ lệ nhãn y90=1 (%) | Cận dưới 95% · y90 (%) | Cận trên 95% · y90 (%) | Nhóm dưới 100 người |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -1666,9 +1727,152 @@ Mỗi hàng dùng người đăng ký năm 2014 trong nhóm tương ứng. Nhãn
 | 2014 | 1 | 1 | Web | 23,142 | 21.3594 | 23,142 | 4,573 | 19.7606 | 19.2526 | 20.2786 | 0 |
 | 2014 | 1 | 1 | iOS | 5,994 | 7.1071 | 5,994 | 339 | 5.6557 | 5.0988 | 6.2693 | 0 |
 
+**B12 · Phương thức đăng ký và giao hai cờ hồ sơ**
+
+| Cách đăng ký | Thiếu tuổi | Không rõ giới tính | Số người dùng | Tỷ lệ nhãn y=1 (%) | Mẫu hợp lệ y90 | Số có nhãn y90=1 | Tỷ lệ nhãn y90=1 (%) | Cận dưới 95% · y90 (%) | Cận trên 95% · y90 (%) | Nhóm dưới 100 người | Trong phương thức đăng ký (%) | Trong nhóm giao hai cờ (%) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| basic | 0 | 0 | 17,583 | 65.1368 | 17,583 | 9,341 | 53.1252 | 52.387 | 53.862 | 0 | 30.526 | 49.9673 |
+| basic | 0 | 1 | 6,942 | 69.3316 | 6,942 | 4,041 | 58.2109 | 57.0464 | 59.3663 | 0 | 12.0521 | 97.1045 |
+| basic | 1 | 0 | 931 | 45.5424 | 931 | 395 | 42.4275 | 39.2903 | 45.627 | 0 | 1.6163 | 61.7784 |
+| basic | 1 | 1 | 32,144 | 17.5367 | 32,144 | 5,140 | 15.9905 | 15.5939 | 16.3953 | 0 | 55.8056 | 98.5378 |
+| facebook | 0 | 0 | 17,512 | 38.1852 | 17,512 | 5,085 | 29.0372 | 28.3696 | 29.7141 | 0 | 95.5895 | 49.7656 |
+| facebook | 0 | 1 | 160 | 35.625 | 160 | 46 | 28.75 | 22.3001 | 36.1963 | 0 | 0.8734 | 2.2381 |
+| facebook | 1 | 0 | 569 | 11.775 | 569 | 55 | 9.6661 | 7.5017 | 12.3714 | 0 | 3.1059 | 37.7571 |
+| facebook | 1 | 1 | 79 | 0 | 79 | 0 | 0 | -0 | 4.6371 | 1 | 0.4312 | 0.2422 |
+| google | 0 | 0 | 94 | 54.2553 | 94 | 37 | 39.3617 | 30.0899 | 49.4689 | 1 | 17.2161 | 0.2671 |
+| google | 0 | 1 | 47 | 68.0851 | 47 | 21 | 44.6809 | 31.411 | 58.7545 | 1 | 8.6081 | 0.6574 |
+| google | 1 | 0 | 7 | 28.5714 | 7 | 1 | 14.2857 | 2.568 | 51.3128 | 1 | 1.2821 | 0.4645 |
+| google | 1 | 1 | 398 | 4.0201 | 398 | 11 | 2.7638 | 1.5501 | 4.8806 | 0 | 72.8938 | 1.2201 |
+
+**B13 · Tỷ lệ thiếu theo tháng đăng ký gồm cả test**
+
+| Tập dữ liệu | Tháng đăng ký | Số người dùng | Thiếu tuổi (%) | Không rõ giới tính (%) | Ngày từ cuối tháng đến mốc lịch giả định |
+| --- | --- | --- | --- | --- | --- |
+| Train | 2010-01 | 61 | 31.1475 | 52.459 | 1,975 |
+| Train | 2010-02 | 102 | 38.2353 | 62.7451 | 1,947 |
+| Train | 2010-03 | 163 | 49.0798 | 64.4172 | 1,916 |
+| Train | 2010-04 | 157 | 42.6752 | 56.051 | 1,886 |
+| Train | 2010-05 | 227 | 42.7313 | 59.9119 | 1,855 |
+| Train | 2010-06 | 222 | 42.3423 | 53.1532 | 1,825 |
+| Train | 2010-07 | 307 | 36.8078 | 49.5114 | 1,794 |
+| Train | 2010-08 | 312 | 39.4231 | 53.5256 | 1,763 |
+| Train | 2010-09 | 371 | 35.8491 | 51.4825 | 1,733 |
+| Train | 2010-10 | 309 | 33.3333 | 52.7508 | 1,702 |
+| Train | 2010-11 | 286 | 40.2098 | 57.3427 | 1,672 |
+| Train | 2010-12 | 271 | 36.5314 | 47.6015 | 1,641 |
+| Train | 2011-01 | 316 | 44.9367 | 57.9114 | 1,610 |
+| Train | 2011-02 | 362 | 46.1326 | 49.4475 | 1,582 |
+| Train | 2011-03 | 491 | 53.7678 | 65.5804 | 1,551 |
+| Train | 2011-04 | 577 | 57.7123 | 67.0711 | 1,521 |
+| Train | 2011-05 | 744 | 56.9892 | 70.4301 | 1,490 |
+| Train | 2011-06 | 822 | 53.0414 | 62.0438 | 1,460 |
+| Train | 2011-07 | 993 | 37.5629 | 38.2679 | 1,429 |
+| Train | 2011-08 | 1,454 | 27.2352 | 29.7111 | 1,398 |
+| Train | 2011-09 | 1,864 | 24.3026 | 27.4678 | 1,368 |
+| Train | 2011-10 | 1,477 | 25.7278 | 29.1131 | 1,337 |
+| Train | 2011-11 | 1,386 | 27.9221 | 29.2929 | 1,307 |
+| Train | 2011-12 | 1,289 | 25.9891 | 27.308 | 1,276 |
+| Train | 2012-01 | 1,589 | 25.1731 | 26.9352 | 1,245 |
+| Train | 2012-02 | 1,789 | 24.7624 | 26.2717 | 1,216 |
+| Train | 2012-03 | 2,192 | 26.7336 | 26.0493 | 1,185 |
+| Train | 2012-04 | 2,589 | 27.4237 | 24.6813 | 1,155 |
+| Train | 2012-05 | 3,325 | 30.6466 | 31.0075 | 1,124 |
+| Train | 2012-06 | 3,867 | 38.9449 | 33.2816 | 1,094 |
+| Train | 2012-07 | 4,582 | 39.8516 | 23.1995 | 1,063 |
+| Train | 2012-08 | 4,476 | 37.0197 | 21.9169 | 1,032 |
+| Train | 2012-09 | 4,035 | 39.653 | 23.767 | 1,002 |
+| Train | 2012-10 | 3,828 | 39.5768 | 26.9592 | 971 |
+| Train | 2012-11 | 3,706 | 34.7545 | 34.9164 | 941 |
+| Train | 2012-12 | 3,484 | 34.1561 | 35.5339 | 910 |
+| Train | 2013-01 | 4,418 | 34.7442 | 36.7361 | 879 |
+| Train | 2013-02 | 4,362 | 37.3453 | 39.9358 | 851 |
+| Train | 2013-03 | 5,421 | 41.8373 | 43.9956 | 820 |
+| Train | 2013-04 | 5,855 | 37.0111 | 39.8634 | 790 |
+| Train | 2013-05 | 6,721 | 36.6612 | 40.8421 | 759 |
+| Train | 2013-06 | 6,765 | 37.3392 | 41.833 | 729 |
+| Train | 2013-07 | 7,950 | 41.6981 | 46.2138 | 698 |
+| Train | 2013-08 | 8,369 | 46.1106 | 51.7744 | 667 |
+| Train | 2013-09 | 9,125 | 47.737 | 53.0411 | 637 |
+| Train | 2013-10 | 7,862 | 46.4131 | 52.6075 | 606 |
+| Train | 2013-11 | 7,751 | 45.1039 | 50.9225 | 576 |
+| Train | 2013-12 | 8,361 | 44.0856 | 50.3528 | 545 |
+| Train | 2014-01 | 11,111 | 45.5495 | 51.7325 | 514 |
+| Train | 2014-02 | 9,967 | 45.4199 | 52.2223 | 486 |
+| Train | 2014-03 | 12,058 | 44.1118 | 51.385 | 455 |
+| Train | 2014-04 | 12,689 | 43.786 | 51.5801 | 425 |
+| Train | 2014-05 | 14,895 | 44.9614 | 52.5277 | 394 |
+| Train | 2014-06 | 15,746 | 44.2525 | 52.407 | 364 |
+| Test | 2014-07 | 21,696 | 46.7736 | 54.4478 | 333 |
+| Test | 2014-08 | 21,626 | 46.8834 | 54.8044 | 302 |
+| Test | 2014-09 | 18,774 | 45.7494 | 53.9416 | 272 |
+
+**B14 · Ứng viên chỉnh sửa hồ sơ trong nhật ký năm 2014**
+
+| Trường | Tên ghi nhận | Số người năm 2014 | Số sự kiện | Tỷ lệ y90=1 (%) | Thiếu tuổi (%) | Không rõ giới tính (%) | Cách chọn ứng viên |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| action | account | 3,868 | 5,293 | 42.4509 | 26.1892 | 36.2461 | Tên hành động rộng, cần đối chiếu nghiệp vụ |
+| action | edit | 11,518 | 56,012 | 47.8729 | 20.0816 | 28.6942 | Tên hành động rộng, cần đối chiếu nghiệp vụ |
+| action | has_profile_pic | 9 | 15 | 11.1111 | 0 | 0 | Tên hành động rộng, cần đối chiếu nghiệp vụ |
+| action | profile_pic | 5,617 | 9,617 | 57.5752 | 10.575 | 28.2535 | Tên hành động rộng, cần đối chiếu nghiệp vụ |
+| action | settings | 1,700 | 6,828 | 31.4706 | 21.1765 | 27.7059 | Tên hành động rộng, cần đối chiếu nghiệp vụ |
+| action | update | 30,394 | 206,115 | 31.0292 | 36.5796 | 42.6729 | Tên hành động rộng, cần đối chiếu nghiệp vụ |
+| action | update_country_of_residence | 4 | 5 | 25 | 25 | 75 | Tên hành động rộng, cần đối chiếu nghiệp vụ |
+| action_detail | edit_profile | 11,474 | 55,768 | 47.9955 | 19.993 | 28.6038 | Chi tiết chỉnh sửa/cập nhật hồ sơ |
+| action_detail | update_user | 7,290 | 11,513 | 21.0014 | 38.4225 | 42.4143 | Chi tiết chỉnh sửa/cập nhật hồ sơ |
+| action_detail | update_user_profile | 6,590 | 15,125 | 52.5341 | 8.695 | 11.6995 | Chi tiết chỉnh sửa/cập nhật hồ sơ |
+| action_detail | user_profile_content_update | 13,122 | 26,786 | 46.3649 | 27.2519 | 37.2047 | Chi tiết chỉnh sửa/cập nhật hồ sơ |
+
+**Ứng viên cập nhật hồ sơ theo giao hai cờ · mẫu số là người có nhật ký**
+
+| Thiếu tuổi | Không rõ giới tính | Người có nhật ký | Có ứng viên cập nhật hồ sơ | Tỷ lệ có ứng viên cập nhật (%) | y90=1 · có ứng viên cập nhật (%) | y90=1 · còn lại (%) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 | 0 | 34,555 | 14,784 | 42.784 | 45.1231 | 38.4604 |
+| 0 | 1 | 7,012 | 2,616 | 37.3075 | 56.8807 | 58.2575 |
+| 1 | 0 | 1,472 | 623 | 42.3234 | 31.9422 | 28.9753 |
+| 1 | 1 | 30,776 | 6,987 | 22.7028 | 17.0173 | 16.4614 |
+
+### Giới hạn của phần nhãn quan sát được
+
+Hàng chỉ có người đã đặt chỗ bị chọn theo kết quả. Nó là phạm vi mô tả nhãn, không phải tập huấn luyện hay kịch bản độ nhạy.
+
+**Phạm vi nhãn có thể mô tả từ dữ liệu**
+
+| Phạm vi mô tả | Dương tính | Âm tính có căn cứ trong phạm vi | Chưa xác định | Mẫu gán được nhãn |
+| --- | --- | --- | --- | --- |
+| Giả định mọi người được theo dõi ít nhất 90 ngày | 74,027 | 139,395 | 29 | 213,422 |
+| Chỉ dùng bằng chứng lượt đặt chỗ đã ghi nhận | 74,027 | 14,852 | 124,572 | 88,879 |
+
+### Entropy hồ sơ: mô tả có điều kiện
+
+Đây là entropy và lift kỳ vọng trên cùng mẫu năm 2014, không phải kết quả kiểm định. Hai cờ chưa hợp lệ tại t0 khi Q1 còn mở, nên bảng không chứng minh một baseline có thể sử dụng. Không dùng bảng này để chọn hoặc chấp nhận nhánh chính.
+
+**Đối chiếu mô tả theo tình trạng thiếu tuổi**
+
+| Mục tiêu | Số người dùng · 2014 | Entropy xác suất hằng | Entropy theo hai nhóm tuổi | Giảm entropy cùng mẫu (%) | Lift kỳ vọng top 20% cùng mẫu |
+| --- | --- | --- | --- | --- | --- |
+| Nhãn y hiện có | 76,466 | 0.6652 | 0.5919 | 11.0149 | 1.4264 |
+| Nhãn y90 · giả định theo dõi ít nhất 90 ngày | 76,466 | 0.6239 | 0.5789 | 7.2188 | 1.3875 |
+
+### Chi tiết mẫu hiệu chỉnh tại từng mốc tháng
+
+Mọi mốc dùng lịch sử đăng ký từ đầu train. Mẫu nhãn hiệu chỉnh dưới đây phải đi kèm điểm OOF theo thời gian, chưa phải một tập dự đoán đã tạo. B7 giữ quy mô đánh giá chính.
+
+**Mẫu nhãn hiệu chỉnh OOF và tỷ lệ trong lịch sử học**
+
+| Mốc dự đoán | Dương tính trong học | Tỷ lệ y90 trong học (%) | Mẫu OOF từ | Mẫu OOF đến | Mẫu nhãn cho hiệu chỉnh OOF | Tháng dự đoán đến |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2013-07-01 | 27,252 | 39.8392 | 2013-01-02 | 2013-04-01 | 14,333 | 2013-07-31 |
+| 2013-08-01 | 29,458 | 39.5494 | 2013-02-02 | 2013-05-02 | 15,939 | 2013-08-31 |
+| 2013-09-01 | 31,877 | 39.2956 | 2013-03-05 | 2013-06-02 | 17,675 | 2013-09-30 |
+| 2013-10-01 | 34,420 | 39.0582 | 2013-04-04 | 2013-07-02 | 19,259 | 2013-10-31 |
+| 2013-11-01 | 37,224 | 38.7601 | 2013-05-05 | 2013-08-02 | 21,192 | 2013-11-30 |
+| 2013-12-01 | 39,967 | 38.4117 | 2013-06-04 | 2013-09-01 | 22,675 | 2013-12-31 |
+| 2014-05-01 | 53,102 | 35.9453 | 2013-11-02 | 2014-01-30 | 26,681 | 2014-05-31 |
+| 2014-06-01 | 56,613 | 35.6806 | 2013-12-03 | 2014-03-02 | 29,525 | 2014-06-30 |
+
 ### Truy vết số liệu trong tóm tắt
 
-Mã B1–B11 đứng trước tên các bảng tương ứng. Các số được làm tròn khi trình bày. Metadata giữ giá trị đầy đủ trong facts và dấu kiểm tra của các bảng thống kê. Các mốc chia thời gian là đề xuất nghiên cứu, không phải kết quả đã thực hiện.
+Mã B1–B17 đứng trước tên các bảng tương ứng. Các số được làm tròn khi trình bày. Metadata giữ giá trị đầy đủ trong facts và dấu kiểm tra của các bảng thống kê. Các mốc chia thời gian là đề xuất nghiên cứu, không phải kết quả đã thực hiện.
 
 **Nguồn của từng phát hiện và việc cần giải quyết**
 
@@ -1676,12 +1880,12 @@ Mã B1–B11 đứng trước tên các bảng tương ứng. Các số được
 | --- | --- | --- | --- |
 | Phát hiện 1 | B1 | Quy mô train, test, số và tỷ lệ nhãn y=1 | facts.rows; facts.test_rows; facts.positive; facts.rate |
 | Phát hiện 2 | B9 | Số dương trong 90 ngày, tỷ lệ trên toàn bộ dòng và mẫu hợp lệ sau khi bỏ ngoại lệ | facts.conditional_90_positive; facts.conditional_90_eligible; facts.conditional_90_rate_pct |
-| Phát hiện 3 | B10 | Tỷ lệ đặt chỗ theo giới tính, tình trạng tuổi và V giữa hai cờ thiếu | profile_summary: nhãn y và V giữa chỉ báo đầu vào trong năm 2014 |
-| Phát hiện 4 | B11 | Chênh lệch ứng dụng trong nhóm có tuổi và có khai báo giới tính | profile_apps: age_missing=False; gender_unknown=False; source_rate |
+| Phát hiện 3 | B10 | Bốn nhóm giao cờ có tỷ lệ y90 không đơn điệu và V giữa hai chỉ báo | profile_summary: tỷ lệ y90 và V giữa chỉ báo đầu vào trong năm 2014 |
+| Phát hiện 4 | B11 | Tỷ lệ y90 theo ứng dụng trong nhóm có tuổi và có khai báo giới tính | profile_apps: age_missing=False; gender_unknown=False; rate90 |
 | Phát hiện 5 | B5 | Độ phủ, chênh độ phủ, tỷ lệ đặt chỗ có/thiếu nhật ký; quy mô train 2014 | facts.train_2014_users; facts.train_2014_session_coverage_pct; sessions_2014 |
-| Việc cần giải quyết 1 | B9; Q3 | Nghiên cứu y90 với giả định theo dõi 365 ngày, ngoại lệ và độ nhạy NDF | Quy tắc conditional_labels và bảng nhạy cảm với giả định |
-| Việc cần giải quyết 2 | B8; Q1 | Mức khớp 100% và điều kiện thông tin tại t0 | Tính trực tiếp từ ngày đặt chỗ có giá trị và nhãn y |
-| Việc cần giải quyết 3 | B7 | Huấn luyện đến 2013-10-02; hiệu chỉnh 2014-01-01 đến 2014-01-30; đệm 90 ngày; đánh giá tháng 5–6/2014 | protocol: cửa sổ, mốc dự đoán, ngày nhãn sẵn có và đệm theo ngày lịch |
+| Việc cần giải quyết 1 | B9; B15; B16; Q3 | Nghiên cứu y90 với giả định theo dõi tối thiểu 90 ngày, kiểm tra tháng và sai nhãn NDF | conditional_labels và các kịch bản B16 giữ nguyên mẫu người dùng |
+| Việc cần giải quyết 2 | B8; B17; Q1 | Mức khớp 100%, nhánh chính tối thiểu và điều kiện thông tin tại t0 | Ngày đặt chỗ/nhãn y và bảng kiểm soát nhánh đầu vào |
+| Việc cần giải quyết 3 | B7 | Tại từng mốc đầu tháng học toàn bộ nhãn đã hoàn tất, hiệu chỉnh bằng điểm OOF lịch sử | protocol: train_to, prediction_origin và mẫu hiệu chỉnh OOF theo thời gian |
 
 ## Tái lập và kiểm soát phạm vi
 
@@ -1729,4 +1933,4 @@ Mỗi giai đoạn 0–4 được dựng lại toàn bộ từ CSV bằng cùng 
 | 1 · Chuẩn hóa | Mỗi hình có quan sát và phạm vi; tiêu đề bảng dùng tên diễn giải; khái niệm có tên thống nhất; phương pháp chi tiết ở cuối | Kiểm tra chú thích, tiêu đề và bảng thuật ngữ |
 | 2 · Tổ chức EDA | Có biểu đồ độ mạnh liên hệ với hai thang riêng; tỷ lệ nhóm có khoảng Wilson; bảng dài nằm ở phụ lục | Kiểm tra hình, bảng và dấu kiểm tra thống kê |
 | 3 · Hiểu dữ liệu | Có quyết định cho toàn bộ 34 cột; sơ đồ quan hệ; phát hiện gắn hàm ý; rủi ro và phù hợp gộp một mục | Đối chiếu số cột CSV, cấu trúc báo cáo và bảng quyết định |
-| 4 · Thiết kế nghiên cứu | Có sơ đồ thời gian và vai trò từng giai đoạn; mọi số trong tóm tắt có bảng nguồn; notebook chạy hết; số liệu khớp sau từng giai đoạn | Đối chiếu B1–B8, nguồn số liệu, lịch sử kiểm tra và mã nguồn trong metadata |
+| 4 · Thiết kế nghiên cứu | Có sơ đồ thời gian và vai trò từng giai đoạn; mọi số trong tóm tắt có bảng nguồn; notebook chạy hết; số liệu khớp sau từng giai đoạn | Đối chiếu B1–B17, nguồn số liệu, lịch sử kiểm tra và mã nguồn trong metadata |

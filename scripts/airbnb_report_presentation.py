@@ -63,6 +63,14 @@ DISPLAY_HEADERS = {
     "gap_start": "Đệm từ ngày", "gap_end": "Đệm đến ngày",
     "source_rate": "Tỷ lệ nhãn y=1 (%)", "n90": "Mẫu hợp lệ y90", "positive90": "Số có nhãn y90=1",
     "rate90": "Tỷ lệ nhãn y90=1 (%)", "lower90": "Cận dưới 95% · y90 (%)", "upper90": "Cận trên 95% · y90 (%)",
+    "train_from": "Đăng ký học từ", "train_to": "Đăng ký học đến", "train_n": "Mẫu học hợp lệ",
+    "train_positive90": "Dương tính trong học", "train_rate90": "Tỷ lệ y90 trong học (%)",
+    "calibration_from": "Mẫu OOF từ", "calibration_to": "Mẫu OOF đến", "calibration_n": "Mẫu nhãn cho hiệu chỉnh OOF",
+    "evaluation_from": "Tháng dự đoán từ", "evaluation_to": "Tháng dự đoán đến", "evaluation_n": "Mẫu đánh giá",
+    "evaluation_positive90": "Dương tính đánh giá", "evaluation_rate90": "Tỷ lệ y90 đánh giá (%)", "maturity_gap_days": "Nhãn chờ hoàn tất (ngày)",
+    "within_method_pct": "Trong phương thức đăng ký (%)", "within_profile_pct": "Trong nhóm giao hai cờ (%)",
+    "source": "Tập dữ liệu", "month": "Tháng đăng ký", "age_missing_pct": "Thiếu tuổi (%)", "gender_unknown_pct": "Không rõ giới tính (%)",
+    "days_from_month_end_to_proxy_cutoff": "Ngày từ cuối tháng đến mốc lịch giả định",
     "component": "Thành phần", "value": "Giá trị", "issue": "Vấn đề", "evidence_or_limit": "Bằng chứng và giới hạn",
 }
 
@@ -383,7 +391,10 @@ def executive_sources(report, by_key):
         ["Test năm 2014", len(test), facts["test_session_users"], test_coverage, test_coverage-train_coverage, np.nan, np.nan],
     ], columns=["Phạm vi", "Số người dùng", "Số có nhật ký", "Độ phủ (%)", "Chênh với train 2014 (điểm %)", "Tỷ lệ đặt chỗ · có nhật ký (%)", "Tỷ lệ đặt chỗ · thiếu nhật ký (%)"])
     by_key["sessions_evidence"]["tables"].insert(0, ("B5 · Độ phủ nhật ký và tỷ lệ đặt chỗ", coverage))
-    by_key["evaluation"]["tables"][0] = ("B7 · Cửa sổ thời gian đề xuất và quy mô quan sát", evidence["protocol"])
+    protocol_main = evidence["protocol"][["prediction_origin", "role", "train_to", "train_n", "evaluation_n", "evaluation_positive90", "evaluation_rate90", "labels_ready_on"]]
+    by_key["evaluation"]["tables"][0] = ("B7 · Các mốc tháng, lịch sử có nhãn và quy mô đánh giá", protocol_main)
+    protocol_details = evidence["protocol"][["prediction_origin", "train_positive90", "train_rate90", "calibration_from", "calibration_to", "calibration_n", "evaluation_to"]]
+    by_key["appendix"]["blocks"].append(section("monthly_protocol_details", "Chi tiết mẫu hiệu chỉnh tại từng mốc tháng", "Mọi mốc dùng lịch sử đăng ký từ đầu train. Mẫu nhãn hiệu chỉnh dưới đây phải đi kèm điểm OOF theo thời gian, chưa phải một tập dự đoán đã tạo. B7 giữ quy mô đánh giá chính.", [("Mẫu nhãn hiệu chỉnh OOF và tỷ lệ trong lịch sử học", protocol_details)]))
     matches = train.date_first_booking.notna().eq(frame.observed_booking.astype(bool))
     leakage = pd.DataFrame([[int(matches.sum()), len(train), matches.mean()*100]],
                            columns=["Số trường hợp khớp", "Số người dùng train", "Tỷ lệ khớp (%)"])
@@ -391,18 +402,18 @@ def executive_sources(report, by_key):
     rows = [
         ["Phát hiện 1", "B1", "Quy mô train, test, số và tỷ lệ nhãn y=1", "facts.rows; facts.test_rows; facts.positive; facts.rate"],
         ["Phát hiện 2", "B9", "Số dương trong 90 ngày, tỷ lệ trên toàn bộ dòng và mẫu hợp lệ sau khi bỏ ngoại lệ", "facts.conditional_90_positive; facts.conditional_90_eligible; facts.conditional_90_rate_pct"],
-        ["Phát hiện 3", "B10", "Tỷ lệ đặt chỗ theo giới tính, tình trạng tuổi và V giữa hai cờ thiếu", "profile_summary: nhãn y và V giữa chỉ báo đầu vào trong năm 2014"],
-        ["Phát hiện 4", "B11", "Chênh lệch ứng dụng trong nhóm có tuổi và có khai báo giới tính", "profile_apps: age_missing=False; gender_unknown=False; source_rate"],
+        ["Phát hiện 3", "B10", "Bốn nhóm giao cờ có tỷ lệ y90 không đơn điệu và V giữa hai chỉ báo", "profile_summary: tỷ lệ y90 và V giữa chỉ báo đầu vào trong năm 2014"],
+        ["Phát hiện 4", "B11", "Tỷ lệ y90 theo ứng dụng trong nhóm có tuổi và có khai báo giới tính", "profile_apps: age_missing=False; gender_unknown=False; rate90"],
         ["Phát hiện 5", "B5", "Độ phủ, chênh độ phủ, tỷ lệ đặt chỗ có/thiếu nhật ký; quy mô train 2014", "facts.train_2014_users; facts.train_2014_session_coverage_pct; sessions_2014"],
-        ["Việc cần giải quyết 1", "B9; Q3", "Nghiên cứu y90 với giả định theo dõi 365 ngày, ngoại lệ và độ nhạy NDF", "Quy tắc conditional_labels và bảng nhạy cảm với giả định"],
-        ["Việc cần giải quyết 2", "B8; Q1", "Mức khớp 100% và điều kiện thông tin tại t0", "Tính trực tiếp từ ngày đặt chỗ có giá trị và nhãn y"],
-        ["Việc cần giải quyết 3", "B7", "Huấn luyện đến 2013-10-02; hiệu chỉnh 2014-01-01 đến 2014-01-30; đệm 90 ngày; đánh giá tháng 5–6/2014", "protocol: cửa sổ, mốc dự đoán, ngày nhãn sẵn có và đệm theo ngày lịch"],
+        ["Việc cần giải quyết 1", "B9; B15; B16; Q3", "Nghiên cứu y90 với giả định theo dõi tối thiểu 90 ngày, kiểm tra tháng và sai nhãn NDF", "conditional_labels và các kịch bản B16 giữ nguyên mẫu người dùng"],
+        ["Việc cần giải quyết 2", "B8; B17; Q1", "Mức khớp 100%, nhánh chính tối thiểu và điều kiện thông tin tại t0", "Ngày đặt chỗ/nhãn y và bảng kiểm soát nhánh đầu vào"],
+        ["Việc cần giải quyết 3", "B7", "Tại từng mốc đầu tháng học toàn bộ nhãn đã hoàn tất, hiệu chỉnh bằng điểm OOF lịch sử", "protocol: train_to, prediction_origin và mẫu hiệu chỉnh OOF theo thời gian"],
     ]
     provenance = pd.DataFrame(rows, columns=["Ý trong tóm tắt", "Bảng hoặc câu hỏi nguồn", "Số liệu và nội dung được đối chiếu", "Đường dẫn dữ liệu hoặc cách tính"])
-    by_key["appendix"]["blocks"].append(section("executive_sources", "Truy vết số liệu trong tóm tắt", "Mã B1–B11 đứng trước tên các bảng tương ứng. Các số được làm tròn khi trình bày. Metadata giữ giá trị đầy đủ trong facts và dấu kiểm tra của các bảng thống kê. Các mốc chia thời gian là đề xuất nghiên cứu, không phải kết quả đã thực hiện.", [("Nguồn của từng phát hiện và việc cần giải quyết", provenance)]))
+    by_key["appendix"]["blocks"].append(section("executive_sources", "Truy vết số liệu trong tóm tắt", "Mã B1–B17 đứng trước tên các bảng tương ứng. Các số được làm tròn khi trình bày. Metadata giữ giá trị đầy đủ trong facts và dấu kiểm tra của các bảng thống kê. Các mốc chia thời gian là đề xuất nghiên cứu, không phải kết quả đã thực hiện.", [("Nguồn của từng phát hiện và việc cần giải quyết", provenance)]))
     text = by_key["executive"]["text"]
     sources = ["B1", "B9", "B10", "B11", "B5"]
-    next_sources = ["B9 và Q3", "B8 và Q1", "B7"]
+    next_sources = ["B9, B15, B16 và Q3", "B8, B17 và Q1", "B7"]
     current = None
     parts = []
     for paragraph in text.split("\n\n"):
@@ -420,12 +431,13 @@ def executive_sources(report, by_key):
     from decimal import Decimal
     pattern = r"(?<![\w.])-?\d[\d,]*(?:\.\d+)?(?![\w.])"
     def numbers_in(text):
+        text = re.sub(r"\by(?:90)?\s*=\s*[01]\b", "", str(text))
         return {str(Decimal(token.replace(",", "")).normalize())
-                for token in re.findall(pattern, str(text))}
+                for token in re.findall(pattern, text)}
     tables = {"B1": size, "B2": evidence["horizons"], "B3": by_key["signal"]["tables"][0][1],
               "B4": missing, "B5": coverage, "B6": evidence["delay"], "B7": evidence["protocol"], "B8": leakage,
               **report.research_tables}
-    citations = [["B1"], ["B9"], ["B10"], ["B11"], ["B5"], ["B9"], ["B8"], ["B7"]]
+    citations = [["B1"], ["B9"], ["B10"], ["B11"], ["B5"], ["B9","B15","B16"], ["B8","B17"], ["B7"]]
     paragraphs = [p for p in parts if re.match(r"^\d\. \*\*", p)]
     checks = []
     for paragraph, references in zip(paragraphs, citations):
@@ -454,16 +466,9 @@ def apply_stage_four(report):
     path = timeline_with_embargo(report)
     by_key["evaluation"]["figures"] = [path]
     report.figure_notes[path.name] = (
-        "**Quan sát:** mỗi tập học cách tập kiểm định hoặc hiệu chỉnh một khoảng đệm 90 ngày. Hiệu chỉnh dùng người đăng ký 2014-01-01 đến 2014-01-30, rồi chờ đến 2014-05-01 mới bắt đầu đánh giá cuối.\n\n"
-        "**Phạm vi và cách đọc:** thanh màu là cửa sổ ngày đăng ký; vùng gạch là khoảng đệm không đưa vào tập trước. Cỡ mẫu loại ngoại lệ chưa gán y90. Ngày nhãn sẵn có dùng quy tắc ngày đăng ký cuối + 91, tương đương ngày thứ 90 hoàn tất trước mốc dự đoán. Toàn bộ nhãn y90 vẫn có điều kiện trên giả định theo dõi đủ 365 ngày."
+        "**Quan sát:** tại mỗi mốc tháng, tập học mở rộng đến mọi nhãn đã hoàn tất. Tháng 5/2014 học đến 2014-01-30, tháng 6/2014 học đến 2014-03-02.\n\n"
+        "**Phạm vi và cách đọc:** vùng xanh là lịch sử có nhãn; gạch chéo là người chưa hoàn tất nhãn tại mốc dự đoán. Khung cam chỉ mẫu nhãn dùng học bộ hiệu chỉnh từ dự đoán OOF lịch sử, nằm trong tập học nền cuối. Việc trùng nhãn lịch sử chỉ hợp lệ khi điểm học bộ hiệu chỉnh là OOF theo thời gian. Đây là đặc tả đề xuất, chưa có dự đoán hoặc mô hình."
     )
-    roles = pd.DataFrame([
-        ["Huấn luyện và chọn cấu hình", "Các cửa sổ học/kiểm định liên tiếp", "Học xử lý dữ liệu trong từng tập học; chọn tham số, số vòng và phương pháp hiệu chỉnh bằng dữ liệu phát triển", "Không dùng nhãn xuất hiện sau mốc dự đoán; tập kiểm định không học thống kê tiền xử lý"],
-        ["Huấn luyện lại", "Từ đầu dữ liệu đến hết 2014-03", "Cố định cấu hình rồi huấn luyện lại mô hình nền", "Không điều chỉnh thiết kế theo kết quả tháng 5–6"],
-        ["Hiệu chỉnh xác suất", "Tháng 4/2014", "Học bộ hiệu chỉnh trên xác suất của mô hình nền đã cố định", "Không huấn luyện lại mô hình nền bằng dữ liệu hiệu chỉnh"],
-        ["Đánh giá cuối", "Tháng 5–6/2014", "Tính log loss, Brier, AP, ROC-AUC, lift và độ ổn định theo tháng", "Dùng sau khi chốt mô hình và bộ hiệu chỉnh; nếu sửa thiết kế phải công bố đánh giá đã bị sử dụng"],
-        ["Đối chiếu test Kaggle", "Tháng 7–9/2014", "Kiểm tra cấu trúc cột, nhóm giá trị mới và thay đổi phân phối", "Không tính chất lượng dự báo vì không có nhãn"],
-    ], columns=["Giai đoạn", "Phạm vi", "Được thực hiện", "Điều kiện tách biệt"])
     by_key["evaluation"]["tables"].append(("Vai trò từng giai đoạn huấn luyện, hiệu chỉnh và đánh giá", research_roles()))
     executive_sources(report, by_key)
     criteria = pd.DataFrame([
@@ -471,7 +476,7 @@ def apply_stage_four(report):
         ["1 · Chuẩn hóa", "Mỗi hình có quan sát và phạm vi; tiêu đề bảng dùng tên diễn giải; khái niệm có tên thống nhất; phương pháp chi tiết ở cuối", "Kiểm tra chú thích, tiêu đề và bảng thuật ngữ"],
         ["2 · Tổ chức EDA", "Có biểu đồ độ mạnh liên hệ với hai thang riêng; tỷ lệ nhóm có khoảng Wilson; bảng dài nằm ở phụ lục", "Kiểm tra hình, bảng và dấu kiểm tra thống kê"],
         ["3 · Hiểu dữ liệu", "Có quyết định cho toàn bộ 34 cột; sơ đồ quan hệ; phát hiện gắn hàm ý; rủi ro và phù hợp gộp một mục", "Đối chiếu số cột CSV, cấu trúc báo cáo và bảng quyết định"],
-        ["4 · Thiết kế nghiên cứu", "Có sơ đồ thời gian và vai trò từng giai đoạn; mọi số trong tóm tắt có bảng nguồn; notebook chạy hết; số liệu khớp sau từng giai đoạn", "Đối chiếu B1–B8, nguồn số liệu, lịch sử kiểm tra và mã nguồn trong metadata"],
+        ["4 · Thiết kế nghiên cứu", "Có sơ đồ thời gian và vai trò từng giai đoạn; mọi số trong tóm tắt có bảng nguồn; notebook chạy hết; số liệu khớp sau từng giai đoạn", "Đối chiếu B1–B17, nguồn số liệu, lịch sử kiểm tra và mã nguồn trong metadata"],
     ], columns=["Giai đoạn", "Điều kiện hoàn thành", "Cách kiểm tra"])
     by_key["reproducibility"]["tables"].append(("Điều kiện hoàn thành và kiểm tra sau từng giai đoạn", criteria))
     by_key["reproducibility"]["text"] += "\n\nMỗi giai đoạn 0–4 được dựng lại toàn bộ từ CSV bằng cùng notebook. Khi xuất báo cáo, chương trình đối chiếu các số liệu chính với metadata trước đó và kiểm tra SHA-256 của các bảng bằng chứng. Sau khi mọi ô chạy thành công, completed_stages trong metadata ghi kết quả của giai đoạn đó. Đây là lịch sử kiểm tra trong cùng bản báo cáo, không tạo bản sao, tag hay nhánh khác."
@@ -537,13 +542,18 @@ def prepare_publication(report):
         report.completed_stages = previous_meta.get("completed_stages", [])
         old = previous_meta["facts"]
         for key, value in old.items():
-            if key in report.facts and isinstance(value, numbers.Number) and key != "completion_stage":
+            policy_revision = old.get("research_revision") == "airbnb_90day_embargo_profile_v2" and report.facts.get("research_revision") == "airbnb_asof_monthly_t0_branches_v3"
+            allowed_policy_change = policy_revision and key == "followup_assumption_days" and value == 365 and report.facts[key] == 90
+            if key in report.facts and isinstance(value, numbers.Number) and key != "completion_stage" and not allowed_policy_change:
                 if value != report.facts[key]:
                     raise ValueError(f"Statistical fact changed: {key}")
         if "statistical_fingerprint" in old:
             if old["statistical_fingerprint"] != report.facts["statistical_fingerprint"]:
-                assert old["analysis_revision"] == "airbnb_completion_stages_0_to_4", "Evidence changed within revision"
-                assert old["statistical_fingerprint"] == report.facts["base_evidence_fingerprint"], "Underlying source evidence changed"
+                if policy_revision:
+                    assert old["base_evidence_fingerprint"] == report.facts["base_evidence_fingerprint"], "Underlying source evidence changed"
+                else:
+                    assert old["analysis_revision"] == "airbnb_completion_stages_0_to_4", "Evidence changed within revision"
+                    assert old["statistical_fingerprint"] == report.facts["base_evidence_fingerprint"], "Underlying source evidence changed"
     for item in walk_sections(report.sections):
         for path in item["figures"]:
             assert path.name in report.figure_notes, f"Missing caption: {path.name}"

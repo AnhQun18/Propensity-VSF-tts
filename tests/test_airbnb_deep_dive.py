@@ -9,7 +9,10 @@ from scripts.airbnb_deep_dive import (
     session_action_counts, session_audit,
 )
 from scripts.airbnb_report_presentation import normalize_text
-from scripts.airbnb_research_revision import conditional_labels, protocol_90
+from scripts.airbnb_research_revision import (
+    MAIN_T0_COLUMNS, conditional_labels, followup_evidence,
+    profile_action_counts, protocol_90,
+)
 from scripts.build_descriptive_reports import md_table
 
 
@@ -19,24 +22,62 @@ class AirbnbDiagnosticTests(unittest.TestCase):
         train = pd.DataFrame({"country_destination": ["US"]*5+["NDF"],
                               "date_first_booking": ["2013-12-31", "2014-01-01", "2014-04-01", "2014-04-02", None, None]})
         conditional, _ = conditional_labels(train, account)
-        observed, _ = conditional_labels(train, account, assume_365=False)
+        observed, _ = conditional_labels(train, account, assume_followup_90=False)
         self.assertTrue(pd.isna(conditional.iloc[0]))
         self.assertEqual(list(conditional.iloc[1:4]), [1,1,0])
         self.assertTrue(pd.isna(conditional.iloc[4]))
         self.assertEqual(conditional.iloc[5], 0)
         self.assertTrue(pd.isna(observed.iloc[5]))
 
-    def test_embargo_covers_learning_and_calibration_label_availability(self):
-        account = pd.Series(pd.to_datetime(["2013-10-02", "2013-10-03", "2014-01-30", "2014-01-31", "2014-05-01"]))
+    def test_monthly_refits_use_all_and_only_mature_labels(self):
+        account = pd.Series(pd.to_datetime(["2013-10-02", "2013-10-03", "2014-01-30", "2014-01-31", "2014-03-02", "2014-03-03", "2014-05-01", "2014-06-01"]))
         train = pd.DataFrame(index=account.index)
-        table = protocol_90(train, account, pd.Series([0]*5, dtype="Int64"))
-        training = table[table.role.eq("học")]
-        self.assertTrue((pd.to_datetime(training.account_to)+pd.Timedelta(days=90) < pd.to_datetime(training.prediction_origin)).all())
-        calibration = table[table.role.eq("hiệu chỉnh")].iloc[0]
-        self.assertEqual(calibration.users, 1, "Jan 31 must stay in the calendar gap")
-        self.assertEqual(calibration.labels_ready_on, "2014-05-01")
-        self.assertEqual(calibration.embargo_days, 90)
-        self.assertTrue(table.loc[table.role.isin(["học","hiệu chỉnh"]), "embargo_days"].eq(90).all())
+        labels = pd.Series([0]*8, dtype="Int64")
+        labels.iloc[1] = pd.NA
+        table = protocol_90(train, account, labels)
+        self.assertEqual(len(table), 8)
+        final = table[table.role.eq("đánh giá cuối")].set_index("prediction_origin")
+        self.assertEqual(final.loc["2014-05-01", "train_to"], "2014-01-30")
+        self.assertEqual(final.loc["2014-05-01", "train_n"], 2)
+        self.assertEqual(final.loc["2014-06-01", "train_to"], "2014-03-02")
+        self.assertEqual(final.loc["2014-06-01", "train_n"], 4)
+        for row in table.itertuples():
+            origin = pd.Timestamp(row.prediction_origin)
+            mature = account.add(pd.Timedelta(days=90)).lt(origin) & labels.notna()
+            self.assertEqual(row.train_n, mature.sum())
+            evaluation = account.between(origin, pd.Timestamp(row.evaluation_to)) & labels.notna()
+            self.assertFalse((mature & evaluation).any())
+            calibration = account.between(pd.Timestamp(row.calibration_from), pd.Timestamp(row.calibration_to)) & labels.notna()
+            self.assertFalse((calibration & ~mature).any())
+            self.assertEqual(row.calibration_n, calibration.sum())
+        developed = table[table.role.eq("phát triển")]
+        self.assertTrue(pd.to_datetime(developed.labels_ready_on).le("2014-05-01").all())
+
+    def test_main_branch_does_not_depend_on_profile_flags(self):
+        self.assertEqual(MAIN_T0_COLUMNS, ("date_account_created",))
+
+    def test_profile_update_candidates_use_exact_names_and_deduplicate_users(self):
+        chunk = pd.DataFrame({"user_id": ["a", "a", "b", "c", None],
+                              "action": ["edit", "edit", "show", "update_listing", "edit"],
+                              "action_detail": ["edit_profile", "edit_profile", "user_profile", "update_listing", "update_user"]})
+        parts = [part for _ in range(2) for part in profile_action_counts(chunk)]
+        combined = pd.concat(parts).groupby(["user_id", "field", "value"]).event_n.sum().reset_index()
+        self.assertEqual(set(combined.user_id), {"a"})
+        self.assertEqual(set(combined.value), {"edit", "edit_profile"})
+        self.assertTrue(combined.event_n.eq(4).all())
+
+    def test_followup_sensitivity_keeps_the_full_eligible_sample(self):
+        account = pd.Series(pd.to_datetime(["2014-01-01"]*4))
+        train = pd.DataFrame({"country_destination": ["US", "US", "NDF", "NDF"],
+                              "date_first_booking": ["2014-01-02", "2014-05-01", None, None]})
+        labels, lag = conditional_labels(train, account)
+        monthly, calendar, sensitivity = followup_evidence(train, account, labels, lag)
+        self.assertEqual(monthly.iloc[0, 2], 2)
+        self.assertEqual(monthly.iloc[0, 4], 50)
+        self.assertTrue(sensitivity["Mẫu người dùng giữ cố định"].eq(4).all())
+        for _, group in sensitivity.groupby("Phạm vi sai nhãn giả định"):
+            np.testing.assert_allclose(group["Tỷ lệ dương kỳ vọng (%)"], [25, 25.5, 27.5, 30])
+        self.assertEqual(calendar.iloc[0, 2], 4)
 
     def test_calendar_years_are_not_formatted_as_grouped_counts(self):
         rendered = md_table(pd.DataFrame({"Năm đăng ký": [2010,2013], "Số người dùng": [213451,76466], "Cỡ mẫu · năm 2014": [76466,76466]}))

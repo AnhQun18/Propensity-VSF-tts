@@ -1,4 +1,4 @@
-"""Conditional 90-day labels, calendar embargo and profile-completeness EDA.
+"""Conditional 90-day labels, monthly as-of evaluation and profile diagnostics.
 
 All labels and windows are diagnostics in memory; no model or feature file is fit.
 """
@@ -8,61 +8,66 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-REVISION = "airbnb_90day_embargo_profile_v2"
+REVISION = "airbnb_asof_monthly_t0_branches_v3"
+MAIN_T0_COLUMNS = ("date_account_created",)
+REGISTRATION_EXTENSION = ("signup_method", "signup_flow", "signup_app")
+PROFILE_UPDATE_DETAILS = {"edit_profile", "update_user", "update_user_profile", "user_profile_content_update"}
+PROFILE_ACTION_NAMES = {"account", "edit", "update", "settings", "profile_pic", "has_profile_pic", "update_country_of_residence"}
 
 
-def conditional_labels(train, account, assume_365=True):
+def conditional_labels(train, account, assume_followup_90=True):
     booking = pd.to_datetime(train.date_first_booking, errors="coerce")
     lag = (booking - account).dt.days
     source_positive = train.country_destination.ne("NDF")
     labels = pd.Series(pd.NA, index=train.index, dtype="Int64")
     valid_positive = source_positive & lag.ge(0) & account.notna()
     labels.loc[valid_positive] = lag[valid_positive].le(90).astype(int)
-    if assume_365:
+    if assume_followup_90:
         labels.loc[~source_positive & booking.isna() & account.notna()] = 0
     return labels, lag
 
 
 def protocol_90(train, account, labels):
-    """Day 90 is included; require its end strictly before a prediction origin."""
-    windows = [
-        ("Lượt 1 · học", "2010-01-01", "2012-10-02", "2013-01-01", "học"),
-        ("Lượt 1 · kiểm định", "2013-01-01", "2013-03-31", "2013-01-01", "kiểm định"),
-        ("Lượt 2 · học", "2010-01-01", "2013-04-01", "2013-07-01", "học"),
-        ("Lượt 2 · kiểm định", "2013-07-01", "2013-08-31", "2013-07-01", "kiểm định"),
-        ("Lượt 3 · học", "2010-01-01", "2013-06-02", "2013-09-01", "học"),
-        ("Lượt 3 · kiểm định", "2013-09-01", "2013-10-02", "2013-09-01", "kiểm định"),
-        ("Huấn luyện lại", "2010-01-01", "2013-10-02", "2014-01-01", "học"),
-        ("Hiệu chỉnh xác suất", "2014-01-01", "2014-01-30", "2014-01-01", "hiệu chỉnh"),
-        ("Đánh giá cuối", "2014-05-01", "2014-06-30", "2014-05-01", "đánh giá"),
-    ]
+    """Monthly as-of refits; calibration uses historical out-of-fold scores."""
+    development = list(pd.date_range("2013-07-01", "2013-12-01", freq="MS"))
+    final = list(pd.date_range("2014-05-01", "2014-06-01", freq="MS"))
     rows = []
-    for purpose, start, end, origin, role in windows:
-        mask = account.between(start, end)
-        chosen = mask & labels.notna()
-        ready = pd.Timestamp(end) + pd.Timedelta(days=91)
-        if role == "học":
-            assert ready <= pd.Timestamp(origin)
-            gap_start = pd.Timestamp(end) + pd.Timedelta(days=1)
-            gap_end = pd.Timestamp(origin) - pd.Timedelta(days=1)
-        elif role == "hiệu chỉnh":
+    for origin in development + final:
+        cutoff = origin - pd.Timedelta(days=91)
+        end = origin + pd.offsets.MonthEnd(0)
+        train_mask = account.le(cutoff) & labels.notna()
+        evaluation_mask = account.between(origin, end) & labels.notna()
+        calibration_from = cutoff - pd.Timedelta(days=89)
+        calibration_mask = account.between(calibration_from, cutoff) & labels.notna()
+        assert not (train_mask & evaluation_mask).any()
+        assert (account[train_mask]+pd.Timedelta(days=90) < origin).all()
+        ready = end + pd.Timedelta(days=91)
+        if origin in development:
             assert ready <= pd.Timestamp("2014-05-01")
-            gap_start, gap_end = pd.Timestamp(end)+pd.Timedelta(days=1), pd.Timestamp("2014-04-30")
-        else:
-            gap_start = gap_end = pd.NaT
         rows.append({
-            "proposed_use": purpose, "account_from": start, "account_to": end,
-            "users": int(mask.sum()), "eligible_90": int(chosen.sum()),
-            "observed_bookings": int(labels[chosen].sum()),
-            "booking_pct": float(labels[chosen].mean()*100) if chosen.any() else np.nan, "prediction_origin": origin,
-            "labels_ready_on": str(ready.date()), "role": role,
-            "gap_start": str(gap_start.date()) if pd.notna(gap_start) else "—",
-            "gap_end": str(gap_end.date()) if pd.notna(gap_end) else "—",
-            "embargo_days": int((gap_end-gap_start).days+1) if pd.notna(gap_start) else 0,
+            "prediction_origin": str(origin.date()), "role": "phát triển" if origin in development else "đánh giá cuối",
+            "train_from": "2010-01-01", "train_to": str(cutoff.date()), "train_n": int(train_mask.sum()),
+            "train_positive90": int(labels[train_mask].sum()), "train_rate90": float(labels[train_mask].mean()*100) if train_mask.any() else np.nan,
+            "calibration_from": str(calibration_from.date()), "calibration_to": str(cutoff.date()),
+            "calibration_n": int(calibration_mask.sum()),
+            "evaluation_from": str(origin.date()), "evaluation_to": str(end.date()),
+            "evaluation_n": int(evaluation_mask.sum()), "evaluation_positive90": int(labels[evaluation_mask].sum()),
+            "evaluation_rate90": float(labels[evaluation_mask].mean()*100) if evaluation_mask.any() else np.nan,
+            "labels_ready_on": str(ready.date()), "maturity_gap_days": 90,
         })
-    result = pd.DataFrame(rows)
-    assert result.loc[result.role.isin(["học", "hiệu chỉnh"]), "embargo_days"].eq(90).all()
-    return result
+    return pd.DataFrame(rows)
+
+
+def profile_action_counts(chunk):
+    parts = []
+    for field, selected in [("action_detail", PROFILE_UPDATE_DETAILS), ("action", PROFILE_ACTION_NAMES)]:
+        chosen = chunk.user_id.notna() & chunk[field].isin(selected)
+        if chosen.any():
+            table = chunk.loc[chosen, ["user_id", field]].rename(columns={field: "value"})
+            counts = table.groupby(["user_id", "value"], sort=False).size().reset_index(name="event_n")
+            counts["field"] = field
+            parts.append(counts[["user_id", "field", "value", "event_n"]])
+    return parts
 
 
 def rates_two_targets(frame, keys):
@@ -104,7 +109,7 @@ def profile_evidence(train, account, labels):
     contrasts = []
     def entropy(p):
         return float(-(p*np.log(p)+(1-p)*np.log1p(-p))) if 0 < p < 1 else 0.
-    for target, label in [("observed_booking", "Nhãn y hiện có"), ("y90", "Nhãn y90 · giả định 365 ngày")]:
+    for target, label in [("observed_booking", "Nhãn y hiện có"), ("y90", "Nhãn y90 · giả định theo dõi ít nhất 90 ngày")]:
         chosen = recent[recent[target].notna()]
         grouped = chosen.groupby("age_missing")[target].agg(["size", "mean"])
         prevalence = float(chosen[target].mean())
@@ -118,32 +123,98 @@ def profile_evidence(train, account, labels):
     return recent, gender, age, overlap, apps, summary, contrast
 
 
+def indirect_profile_evidence(report, recent):
+    signup = rates_two_targets(recent, ["signup_method", "age_missing", "gender_unknown"])
+    signup["within_method_pct"] = signup.n / signup.groupby("signup_method").n.transform("sum") * 100
+    signup["within_profile_pct"] = signup.n / signup.groupby(["age_missing", "gender_unknown"]).n.transform("sum") * 100
+    cohorts = []
+    cutoff = pd.to_datetime(report.airbnb_context["train"].date_first_booking).max()
+    for source, data in [("Train", report.airbnb_context["train"]), ("Test", report.airbnb_context["test"])]:
+        frame = data.assign(month=pd.to_datetime(data.date_account_created).dt.to_period("M").astype(str),
+                            age_missing=data.age.isna(), gender_unknown=data.gender.eq("-unknown-"))
+        table = frame.groupby("month").agg(n=("id", "size"), age_missing_pct=("age_missing", "mean"), gender_unknown_pct=("gender_unknown", "mean")).reset_index()
+        table[["age_missing_pct", "gender_unknown_pct"]] *= 100
+        table.insert(0, "source", source)
+        table["days_from_month_end_to_proxy_cutoff"] = [(cutoff - pd.Period(month).end_time.normalize()).days for month in table.month]
+        cohorts.append(table)
+    cohorts = pd.concat(cohorts, ignore_index=True)
+    counts = getattr(report, "profile_action_counts", pd.DataFrame(columns=["user_id", "field", "value", "event_n"]))
+    joined = counts.merge(recent[["id", "y90", "age_missing", "gender_unknown"]], left_on="user_id", right_on="id", how="inner", validate="many_to_one")
+    actions = []
+    for (field, value), group in joined.groupby(["field", "value"], sort=True):
+        actions.append([field, value, len(group), int(group.event_n.sum()), float(group.y90.mean()*100),
+                        group.age_missing.mean()*100, group.gender_unknown.mean()*100,
+                        "Chi tiết chỉnh sửa/cập nhật hồ sơ" if field == "action_detail" else "Tên hành động rộng, cần đối chiếu nghiệp vụ"])
+    actions = pd.DataFrame(actions, columns=["Trường", "Tên ghi nhận", "Số người năm 2014", "Số sự kiện", "Tỷ lệ y90=1 (%)", "Thiếu tuổi (%)", "Không rõ giới tính (%)", "Cách chọn ứng viên"])
+    strict_users = set(joined.loc[joined.field.eq("action_detail"), "user_id"])
+    # Denominators include all 2014 users with logs, not only those who updated.
+    log_users = set(report.airbnb_context["session_user_ids"])
+    logs = recent[recent.id.isin(log_users)].assign(profile_update=lambda x: x.id.isin(strict_users))
+    strata = []
+    for (missing_age, missing_gender), group in logs.groupby(["age_missing", "gender_unknown"]):
+        strata.append([missing_age, missing_gender, len(group), int(group.profile_update.sum()), group.profile_update.mean()*100,
+                       float(group.loc[group.profile_update,"y90"].mean()*100) if group.profile_update.any() else np.nan,
+                       float(group.loc[~group.profile_update,"y90"].mean()*100) if (~group.profile_update).any() else np.nan])
+    strata = pd.DataFrame(strata, columns=["Thiếu tuổi", "Không rõ giới tính", "Người có nhật ký", "Có ứng viên cập nhật hồ sơ", "Tỷ lệ có ứng viên cập nhật (%)", "y90=1 · có ứng viên cập nhật (%)", "y90=1 · còn lại (%)"])
+    return signup, cohorts, actions, strata
+
+
+def followup_evidence(train, account, labels, lag):
+    from scripts.build_descriptive_reports import wilson
+    rows = []
+    for month in sorted(account[account.dt.year.eq(2014)].dt.to_period("M").unique()):
+        chosen = account.dt.to_period("M").eq(month)
+        valid = chosen & train.country_destination.ne("NDF") & lag.ge(0)
+        n, within = int(valid.sum()), int((valid & lag.le(90)).sum())
+        lo, hi = wilson(within, n)
+        rows.append([str(month), int(chosen.sum()), n, within, within/n*100, float(lo), float(hi)])
+    monthly = pd.DataFrame(rows, columns=["Tháng đăng ký", "Người dùng", "Người đã đặt chỗ · độ trễ hợp lệ", "Đặt chỗ trong 90 ngày", "Trong 90 ngày trên nhóm đã đặt chỗ (%)", "Cận dưới Wilson 95% (%)", "Cận trên Wilson 95% (%)"])
+    cutoff = pd.to_datetime(train.date_first_booking).max()
+    gaps = (cutoff-account).dt.days
+    calendar = pd.DataFrame([[str(cutoff.date()), days, int(gaps.ge(days).sum()), len(train), gaps.ge(days).mean()*100]
+                             for days in [90,365]], columns=["Ngày kết thúc giả định chung", "Khoảng lịch tối thiểu (ngày)", "Số người có đủ khoảng lịch", "Mẫu số", "Tỷ lệ (%)"])
+    eligible = labels.notna()
+    source_ndf = train.country_destination.eq("NDF") & eligible
+    positive = int(labels.eq(1).sum())
+    sensitivity = []
+    for name, scope in [("Mọi NDF", source_ndf), ("Chỉ NDF đăng ký năm 2014", source_ndf & account.dt.year.eq(2014))]:
+        for q in [0., .01, .05, .10]:
+            extra = int(scope.sum())*q
+            sensitivity.append([name, q*100, int(scope.sum()), int(eligible.sum()), positive, extra,
+                                (positive+extra)/eligible.sum()*100])
+    sensitivity = pd.DataFrame(sensitivity, columns=["Phạm vi sai nhãn giả định", "NDF có đặt chỗ 90 ngày chưa ghi nhận (%)", "NDF chịu tác động", "Mẫu người dùng giữ cố định", "Dương tính đã ghi nhận", "Dương tính bổ sung kỳ vọng", "Tỷ lệ dương kỳ vọng (%)"])
+    return monthly, calendar, sensitivity
+
+
 def timeline_with_embargo(report):
     import matplotlib.dates as mdates
     from matplotlib.patches import Patch
     table = report.airbnb_evidence["protocol"]
     fig, axes = plt.subplots(2, 1, figsize=(14, 10), gridspec_kw={"height_ratios": [2, 1]}, layout="constrained")
-    palette = {"học": "#245D80", "kiểm định": "#468477", "hiệu chỉnh": "#C76A37", "đánh giá": "#8A6598"}
-    for ax, rows, left in [(axes[0], table, "2009-12-01"), (axes[1], table.iloc[6:], "2013-07-01")]:
+    for ax, rows, left in [(axes[0], table, "2009-12-01"), (axes[1], table[table.role.eq("đánh giá cuối")], "2013-07-01")]:
         for pos, row in enumerate(rows.itertuples(index=False)):
-            start, end = pd.Timestamp(row.account_from), pd.Timestamp(row.account_to)+pd.Timedelta(days=1)
-            ax.broken_barh([(mdates.date2num(start), (end-start).days)], (pos-.3, .6), facecolors=palette[row.role])
-            if row.embargo_days:
-                gap = pd.Timestamp(row.gap_start)
-                ax.broken_barh([(mdates.date2num(gap), row.embargo_days)], (pos-.3, .6), facecolors="#e6e6e6", edgecolors="#909090", hatch="///")
-            ax.annotate(f"n={row.eligible_90:,}", (mdates.date2num(pd.Timestamp("2014-08-01")), pos), va="center", fontsize=9)
-        ax.set_yticks(range(len(rows)), rows.proposed_use)
+            start, end = pd.Timestamp(row.train_from), pd.Timestamp(row.train_to)+pd.Timedelta(days=1)
+            origin = pd.Timestamp(row.prediction_origin)
+            evaluation_end = pd.Timestamp(row.evaluation_to)+pd.Timedelta(days=1)
+            ax.broken_barh([(mdates.date2num(start), (end-start).days)], (pos-.3, .6), facecolors="#245D80")
+            ax.broken_barh([(mdates.date2num(end), (origin-end).days)], (pos-.3, .6), facecolors="#eeeeee", edgecolors="#909090", hatch="///")
+            cfrom = pd.Timestamp(row.calibration_from)
+            ax.broken_barh([(mdates.date2num(cfrom), (end-cfrom).days)], (pos-.25, .5), facecolors="none", edgecolors="#C76A37", linewidth=2)
+            ax.broken_barh([(mdates.date2num(origin), (evaluation_end-origin).days)], (pos-.3,.6), facecolors="#8A6598" if row.role=="đánh giá cuối" else "#468477")
+            ax.annotate(f"học n={row.train_n:,}", (mdates.date2num(pd.Timestamp("2014-08-01")), pos), va="center", fontsize=9)
+        ax.set_yticks(range(len(rows)), [f"{r.prediction_origin} · {r.role}" for r in rows.itertuples()])
         ax.invert_yaxis()
         ax.set_xlim(mdates.date2num(pd.Timestamp(left)), mdates.date2num(pd.Timestamp("2014-12-01")))
         ax.xaxis.set_major_locator(mdates.MonthLocator(interval=6 if ax is axes[0] else 2))
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%Y"))
         ax.grid(axis="x", alpha=.2)
-    axes[0].set_title("Nhãn 90 ngày · cửa sổ học và khoảng đệm theo ngày lịch")
-    axes[1].set_title("Phóng to: huấn luyện lại → đệm 90 ngày → hiệu chỉnh → đệm 90 ngày → đánh giá")
+    axes[0].set_title("Mỗi mốc tháng: học trên toàn bộ nhãn đã hoàn tất, dự đoán trong tháng đó")
+    axes[1].set_title("Hai mốc cuối: mẫu hiệu chỉnh OOF nằm trong lịch sử đã có nhãn")
     axes[1].set_xlabel("Ngày tạo tài khoản")
-    handles = [Patch(facecolor=color, label=label) for label, color in palette.items()]
-    handles.append(Patch(facecolor="#e6e6e6", hatch="///", label="Đệm 90 ngày · không đưa vào tập trước"))
-    axes[1].legend(handles=handles, loc="upper center", bbox_to_anchor=(.5, -.25), ncol=3, frameon=False)
+    handles = [Patch(facecolor="#245D80",label="Toàn bộ nhãn đã hoàn tất"), Patch(facecolor="#468477",label="Tháng phát triển"),
+               Patch(facecolor="#8A6598",label="Tháng đánh giá cuối"), Patch(facecolor="#eeeeee",hatch="///",label="Nhãn chưa hoàn tất"),
+               Patch(facecolor="none",edgecolor="#C76A37",label="Nhãn có dự đoán OOF để hiệu chỉnh")]
+    axes[1].legend(handles=handles, loc="upper center", bbox_to_anchor=(.5, -.25), ncol=2, frameon=False)
     return report.savefig("evaluation_timeline", fig)
 
 
@@ -153,13 +224,20 @@ def apply_research_revision(report):
     context = report.airbnb_context
     train, account, frame = context["train"], context["account"], context["frame"]
     labels, lag = conditional_labels(train, account)
-    no_assumption, _ = conditional_labels(train, account, assume_365=False)
+    no_assumption, _ = conditional_labels(train, account, assume_followup_90=False)
     recent, gender, age, overlap, apps, profile_summary, contrast = profile_evidence(train, account, labels)
     protocol = protocol_90(train, account, labels)
+    context["session_user_ids"] = report.session_user_ids
+    signup, cohort_missing, profile_actions, update_strata = indirect_profile_evidence(report, recent)
+    monthly_coverage, calendar_followup, sensitivity = followup_evidence(train, account, labels, lag)
+    cells = overlap.set_index(["age_missing", "gender_unknown"])
+    for flags, name in [((False,True), "Có tuổi, không rõ giới tính · y90 (%)"), ((False,False), "Có tuổi, có khai báo giới tính · y90 (%)"),
+                        ((True,False), "Thiếu tuổi, có khai báo giới tính · y90 (%)"), ((True,True), "Thiếu cả hai thông tin · y90 (%)")]:
+        profile_summary[name] = cells.loc[flags, "rate90"]
     positive, eligible, unknown = int(labels.eq(1).sum()), int(labels.notna().sum()), int(labels.isna().sum())
     source_positive = train.country_destination.ne("NDF")
     summary90 = pd.DataFrame([{
-        "Giả định theo dõi (ngày)": 365, "Thời hạn (ngày)": 90,
+        "Giả định theo dõi tối thiểu (ngày)": 90, "Thời hạn (ngày)": 90,
         "Toàn bộ người dùng": len(train), "Dương tính y90": positive,
         "Âm tính y90 có điều kiện": int(labels.eq(0).sum()), "Chưa gán nhãn": unknown,
         "Mẫu hợp lệ": eligible, "Dương tính trên toàn bộ dòng (%)": positive/len(train)*100,
@@ -168,84 +246,120 @@ def apply_research_revision(report):
     construction = pd.DataFrame([
         ["Đã đặt chỗ, độ trễ từ 0 đến 90 ngày", int((source_positive & lag.between(0,90)).sum()), "1", "Đã quan sát lượt đặt chỗ trong thời hạn"],
         ["Đã đặt chỗ, độ trễ lớn hơn 90 ngày", int((source_positive & lag.gt(90)).sum()), "0", "Lượt đặt chỗ đầu tiên xảy ra sau thời hạn"],
-        ["NDF", int((~source_positive).sum()), "0 có điều kiện", "Chỉ gán âm khi chấp nhận giả định theo dõi đủ 365 ngày"],
+        ["NDF", int((~source_positive).sum()), "0 có điều kiện", "Cần theo dõi đủ ít nhất 90 ngày, không cần đủ 365 ngày"],
         ["Ngày đặt chỗ âm hoặc không xác định", unknown, "Chưa gán", "Loại khỏi mẫu nghiên cứu 90 ngày cho đến khi xác minh"],
     ], columns=["Trường hợp", "Số người dùng", "Nhãn y90", "Căn cứ"])
-    sensitivity = pd.DataFrame([
-        ["Giả định mỗi người được theo dõi 365 ngày", positive, int(labels.eq(0).sum()), unknown, eligible],
+    observed_limits = pd.DataFrame([
+        ["Giả định mọi người được theo dõi ít nhất 90 ngày", positive, int(labels.eq(0).sum()), unknown, eligible],
         ["Chỉ dùng bằng chứng lượt đặt chỗ đã ghi nhận", int(no_assumption.eq(1).sum()), int(no_assumption.eq(0).sum()), int(no_assumption.isna().sum()), int(no_assumption.notna().sum())],
-    ], columns=["Kịch bản", "Dương tính", "Âm tính xác định trong kịch bản", "Chưa xác định", "Mẫu gán được nhãn"])
+    ], columns=["Phạm vi mô tả", "Dương tính", "Âm tính có căn cứ trong phạm vi", "Chưa xác định", "Mẫu gán được nhãn"])
     by_key = {item["key"]: item for item in walk_sections(report.sections)}
     delay = by_key["booking_delay"]
-    delay["text"] = delay["text"].split("Ngày đặt chỗ muộn nhất")[0] + """Ngày đặt chỗ muộn nhất là 2015-06-29, cách ngày tạo tài khoản cuối 2014-06-30 là 364 ngày. Độ trễ lớn nhất của từng nhóm năm đăng ký đều bằng 365 ngày. Hai quan sát này ủng hộ mạnh giả thuyết mỗi người được theo dõi tối đa 365 ngày kể từ đăng ký. Chúng chưa trực tiếp xác nhận thời gian theo dõi của từng người mang mã NDF.
+    delay["text"] = delay["text"].split("Ngày đặt chỗ muộn nhất")[0] + """Nhãn y90 chỉ yêu cầu được theo dõi ít nhất 90 ngày. Giới hạn độ trễ 365 ngày trong các nhóm năm là bằng chứng về cấu trúc dữ liệu, không phải điều kiện cần của y90 và không chứng minh mọi NDF đã được theo dõi một năm.
 
-Báo cáo dùng giả thuyết theo dõi đủ 365 ngày làm giả định làm việc để xây dựng nhãn nghiên cứu y90 ngay trong EDA. Đây là phân tích có điều kiện và có kịch bản độ nhạy, thay vì chặn toàn bộ nghiên cứu 90 ngày. Xác nhận chính thức cơ chế theo dõi vẫn là điều kiện trước khi suy rộng hoặc triển khai.
+Báo cáo gán y90 dưới giả định NDF được theo dõi đủ 90 ngày. Với mốc kết thúc chung giả định 2015-06-29, toàn bộ train có khoảng lịch ít nhất 90 ngày, còn khoảng 99.72% có đủ 365 ngày. Mốc này chỉ là phép kiểm tra lịch có điều kiện, không phải ngày theo dõi thực tế đã xác nhận cho từng người.
 
-Nhãn y90 bằng 1 nếu ngày đặt chỗ đầu tiên cách ngày tạo tài khoản từ 0 đến 90 ngày, gồm cả hai đầu. Nhãn bằng 0 cho lượt đặt chỗ muộn hơn 90 ngày và cho NDF dưới giả định theo dõi đủ 365 ngày. Các ngoại lệ ngày đặt chỗ âm để trạng thái chưa gán. Ngày 0 được giữ theo độ phân giải ngày của CSV; Q1/Q2 vẫn cần làm rõ thứ tự trong ngày."""
-    delay["tables"].extend([("B9 · Nhãn nghiên cứu 90 ngày dưới giả định theo dõi 365 ngày", summary90),
-                            ("Quy tắc gán nhãn 90 ngày và số lượng", construction), ("Độ nhạy khi không giả định theo dõi cho NDF", sensitivity)])
+Nhãn y90 bằng 1 khi độ trễ đặt chỗ từ 0 đến 90 ngày, gồm cả hai đầu. Các lượt đặt chỗ sau ngày 90 có nhãn 0. NDF chỉ có nhãn 0 dưới giả định theo dõi tối thiểu trên. Ngoại lệ ngày đặt chỗ âm chưa được gán. Nhóm chỉ gồm người đã đặt chỗ có thể mô tả phần nhãn quan sát được nhưng bị chọn theo kết quả, nên không được dùng làm tập huấn luyện hoặc gọi là phân tích độ nhạy."""
+    delay["tables"].extend([("B9 · Nhãn y90 dưới giả định theo dõi ít nhất 90 ngày", summary90),
+                            ("Quy tắc gán nhãn 90 ngày và số lượng", construction)])
     profile_text = f"""Trong nhóm đăng ký năm 2014, tỷ lệ có nhãn y=1 của FEMALE và MALE gần bằng nhau, lần lượt {profile_summary.iloc[0,1]:.2f}% và {profile_summary.iloc[0,2]:.2f}%. Nhóm không rõ giới tính chỉ đạt {profile_summary.iloc[0,3]:.2f}%. Vì vậy, liên hệ biên của cột giới tính chủ yếu phản ánh sự khác nhau giữa hồ sơ có và thiếu thông tin, không nên trình bày như một hiệu ứng riêng của giới tính.
 
-Cờ thiếu tuổi và cờ không rõ giới tính có Cramér V={profile_summary.iloc[0,-1]:.3f}. Đây là liên hệ mạnh giữa hai chỉ báo đầu vào, cho thấy tín hiệu chồng lặp. Nó không tự chứng minh cộng tuyến hoàn toàn hoặc quan hệ nhân quả. Cần kiểm tra loại từng cờ trong cùng thiết kế Logistic Regression và CatBoost.
+Cờ thiếu tuổi và cờ không rõ giới tính có Cramér V={profile_summary['V giữa hai cờ thiếu hồ sơ'].iloc[0]:.3f}. Tuy vậy, nhóm có tuổi nhưng không rõ giới tính có y90={cells.loc[(False,True),'rate90']:.2f}%, cao hơn nhóm có cả tuổi và khai báo giới tính ({cells.loc[(False,False),'rate90']:.2f}%). Bốn ô không tăng đơn điệu theo số thông tin được điền. Vì vậy, báo cáo không diễn giải hai cờ thành một thang mức độ đầy đủ hồ sơ.
+
+Một cơ chế có thể là luồng đăng ký khác nhau hoặc hồ sơ được bổ sung khi đặt chỗ. Các bảng phương thức đăng ký, nhóm thời gian gồm cả test và ứng viên cập nhật hồ sơ trong nhật ký kiểm tra gián tiếp các giả thuyết này. Chúng không xác định được thời điểm điền tuổi hay giới tính vì CSV thiếu lịch sử hồ sơ và nhật ký không có thời điểm sự kiện. Hai cờ nằm ngoài nhánh chính; chỉ được đưa vào nhánh có điều kiện khi Q1 có bằng chứng xác nhận.
 
 Bảng và hình dưới tách đồng thời năm đăng ký, tình trạng thiếu tuổi và tình trạng không rõ giới tính trước khi so sánh ứng dụng. Chúng báo cả nhãn y hiện có và nhãn y90 có điều kiện. Các khoảng Wilson dành cho tỷ lệ y90 trong từng ô, với n<100 được đánh dấu. Giá trị tuổi và các cờ thiếu vẫn phải được xác minh là có sẵn tại t0."""
-    profile = section("profile_completeness", "Độ đầy đủ hồ sơ và chênh lệch ứng dụng sau phân tầng", profile_text,
-                      [("B10 · Tín hiệu độ đầy đủ hồ sơ · năm 2014", profile_summary)])
+    signup_lookup = signup.set_index(["signup_method", "age_missing", "gender_unknown"])
+    basic_unknown, basic_known = signup_lookup.loc[("basic",False,True)], signup_lookup.loc[("basic",False,False)]
+    basic_missing, facebook_missing = signup_lookup.loc[("basic",True,True)], signup_lookup.loc[("facebook",True,True)]
+    recent_cohorts = cohort_missing[cohort_missing.source.eq("Train") & cohort_missing.month.ge("2014-01")]
+    test_cohorts = cohort_missing[cohort_missing.source.eq("Test")]
+    log_n, update_n = int(update_strata.iloc[:,2].sum()), int(update_strata.iloc[:,3].sum())
+    profile_text += f"""\n\n**Kết quả kiểm tra gián tiếp:** trong năm 2014, nhóm thiếu cả hai thông tin chiếm {basic_missing.within_method_pct:.2f}% người đăng ký basic, so với {facebook_missing.within_method_pct:.2f}% qua facebook (B12). Cơ cấu luồng đăng ký vì vậy là một lời giải thích cần kiểm tra. Tuy nhiên, ngay trong basic, nhóm có tuổi nhưng không rõ giới tính vẫn có y90={basic_unknown.rate90:.2f}%, so với {basic_known.rate90:.2f}% ở nhóm có cả hai thông tin. Tách cách đăng ký chưa giải thích hết chênh lệch.
+
+Tỷ lệ không rõ giới tính ở train tháng 1–6/2014 nằm trong {recent_cohorts.gender_unknown_pct.min():.2f}–{recent_cohorts.gender_unknown_pct.max():.2f}%, còn test tháng 7–9/2014 là {test_cohorts.gender_unknown_pct.min():.2f}–{test_cohorts.gender_unknown_pct.max():.2f}% (B13). Test mới hơn có tỷ lệ thiếu cao hơn, nhưng cơ cấu đăng ký và quá trình thu thập cũng có thể thay đổi. So sánh này chưa tách được các cơ chế.
+
+Trong {log_n:,} người đăng ký năm 2014 có nhật ký, {update_n:,} người ({update_n/log_n*100:.2f}%) có ít nhất một chi tiết hành động thuộc nhóm chỉnh sửa/cập nhật hồ sơ (B14 và bảng giao cờ bên cạnh). Mỗi người chỉ được đếm một lần trong tổng này. Các tên hành động rộng được báo riêng. Nhật ký cho thấy có hoạt động liên quan đến hồ sơ, nhưng không cho biết đó có phải thay đổi tuổi/giới tính hay xảy ra trước hoặc sau đăng ký/đặt chỗ. Do đó, Q1 vẫn chặn nhánh B."""
+    profile_display = pd.DataFrame([[name, str(int(value)) if name == "Năm đăng ký" else f"{value:.3f}" if name.startswith("V ") else f"{value:.2f}"]
+                                    for name, value in profile_summary.iloc[0].items()], columns=["Chỉ tiêu", "Giá trị"])
+    profile = section("profile_completeness", "Cơ chế thiếu hồ sơ và rủi ro về thời điểm có sẵn", profile_text,
+                      [("B10 · Bốn nhóm hồ sơ và hai cờ liên hệ mạnh · năm 2014", profile_display)])
     by_key["multivariate_main"]["blocks"].insert(2, profile)
-    by_key["appendix"]["blocks"].append(section("profile_details", "Chi tiết phân tầng theo độ đầy đủ hồ sơ", "Mỗi hàng dùng người đăng ký năm 2014 trong nhóm tương ứng. Nhãn y và y90 là hai mục tiêu khác nhau. Các bảng giữ cỡ mẫu và khoảng Wilson của y90.",
+    by_key["appendix"]["blocks"].append(section("profile_details", "Chi tiết phân tầng theo giao hai cờ hồ sơ", "Mỗi hàng dùng người đăng ký năm 2014 trong nhóm tương ứng. Nhãn y và y90 là hai mục tiêu khác nhau. Các bảng giữ cỡ mẫu và khoảng Wilson của y90.",
         [("Giới tính khai báo · hai mục tiêu", gender), ("Tình trạng tuổi · hai mục tiêu", age), ("Giao hai cờ thiếu hồ sơ", overlap),
-         ("B11 · Ứng dụng trong từng mức độ đầy đủ hồ sơ", apps)]))
+         ("B11 · Ứng dụng trong từng nhóm giao hai cờ hồ sơ", apps),
+         ("B12 · Phương thức đăng ký và giao hai cờ hồ sơ", signup),
+         ("B13 · Tỷ lệ thiếu theo tháng đăng ký gồm cả test", cohort_missing),
+         ("B14 · Ứng viên chỉnh sửa hồ sơ trong nhật ký năm 2014", profile_actions),
+         ("Ứng viên cập nhật hồ sơ theo giao hai cờ · mẫu số là người có nhật ký", update_strata)]))
+    by_key["appendix"]["blocks"].append(section("observed_label_limits", "Giới hạn của phần nhãn quan sát được", "Hàng chỉ có người đã đặt chỗ bị chọn theo kết quả. Nó là phạm vi mô tả nhãn, không phải tập huấn luyện hay kịch bản độ nhạy.", [("Phạm vi nhãn có thể mô tả từ dữ liệu", observed_limits)]))
+    followup = section("followup_checks", "Theo dõi 90 ngày: bằng chứng theo tháng và độ nhạy giả định", "Tỷ lệ trong 90 ngày trên nhóm đã đặt chỗ được kiểm tra theo tháng để tìm dấu hiệu cắt cụt ở cuối train. Sự ổn định của tỷ lệ này chưa xác nhận thời gian theo dõi NDF. Phân tích độ nhạy giữ nguyên mẫu người dùng: giả sử một tỷ lệ NDF có đặt chỗ 90 ngày chưa được ghi nhận, rồi tính khoảng thay đổi tỷ lệ dương. Tham số này chưa được ước lượng từ dữ liệu. Các kết quả không phải nhãn thật mới, không dùng huấn luyện và chưa đánh giá độ nhạy của chất lượng mô hình.",
+                       [("B15 · Mức bao phủ 90 ngày theo tháng trên nhóm đã đặt chỗ", monthly_coverage),
+                        ("Khoảng lịch theo một ngày kết thúc chung giả định", calendar_followup),
+                        ("B16 · Độ nhạy với sai nhãn NDF trên cùng mẫu người dùng", sensitivity)])
+    followup["text"] += f"\n\nB15 cho thấy tỷ lệ trong 90 ngày trên người đã đặt chỗ ở tháng 1–6/2014 nằm trong {monthly_coverage.iloc[:,4].min():.2f}–{monthly_coverage.iloc[:,4].max():.2f}%. Tỷ lệ không giảm dần về cuối train, nên chưa thấy dấu hiệu cắt cụt từ phép kiểm tra này. B16 kiểm tra giả định khác: nếu có đặt chỗ sớm chưa được ghi nhận trong NDF, tỷ lệ dương thay đổi ra sao khi vẫn giữ nguyên {eligible:,} người. Đây là độ nhạy của tỷ lệ nhãn với sai nhãn giả định, chưa phải độ nhạy của chất lượng dự đoán."
+    by_key["multivariate_main"]["blocks"].insert(1, followup)
+    plot_followup_and_cohorts(report, monthly_coverage, cohort_missing, followup)
     plot_profiles(report, recent, apps, profile)
-    by_key["signal"]["text"] += "\n\nCramér V của giới tính và cờ thiếu tuổi không được xem là hai bằng chứng dự báo độc lập. Phần độ đầy đủ hồ sơ bên dưới định lượng mức chồng lặp và tách chênh lệch ứng dụng trong từng nhóm hồ sơ."
+    by_key["signal"]["text"] += "\n\nCramér V của giới tính và cờ thiếu tuổi không được xem là hai bằng chứng dự báo độc lập. Phần cơ chế thiếu hồ sơ bên dưới định lượng mức chồng lặp và tách chênh lệch ứng dụng trong từng nhóm hồ sơ."
     risk = by_key["risks"]
-    risk["text"] = """Airbnb phù hợp để nghiên cứu xác suất đặt chỗ đầu tiên tại thời điểm đăng ký. Báo cáo phân biệt nhãn y hiện có với nhãn nghiên cứu y90 dưới giả định theo dõi đủ 365 ngày. Nghiên cứu y90 có thể bắt đầu với giả định được công khai và kiểm tra độ nhạy. Việc triển khai còn cần xác minh hồ sơ tại t0 và cơ chế theo dõi NDF."""
+    risk["text"] = """Nhãn y90 dùng giả định theo dõi NDF ít nhất 90 ngày. Rủi ro đầu vào được quản lý bằng nhánh chính không dùng tuổi, giới tính hoặc cờ thiếu hồ sơ. Dữ liệu hiện tại chỉ xác nhận trực tiếp mốc tạo tài khoản; mọi mở rộng cần bằng chứng về sự kiện gốc tại t0. Hai cờ hồ sơ và các thuộc tính có thể cập nhật chỉ nằm trong nhánh có điều kiện. Chưa có mô hình nào được chấp nhận hoặc triển khai."""
     suitability = risk["tables"][0][1]
-    suitability.loc[suitability.criterion.eq("Nhãn tin cậy"), ["status", "remaining_condition"]] = ["Nghiên cứu y90 có điều kiện", "Dùng giả định theo dõi 365 ngày và báo độ nhạy. Xác nhận chính thức Q3 trước triển khai; loại 29 ngoại lệ khỏi mẫu y90."]
+    suitability.loc[suitability.criterion.eq("Nhãn tin cậy"), ["status", "remaining_condition"]] = ["Nghiên cứu y90 có điều kiện", "Cần theo dõi ít nhất 90 ngày; kiểm tra theo tháng và độ nhạy sai nhãn NDF. Loại 29 ngoại lệ khỏi mẫu y90."]
+    suitability.loc[suitability.criterion.eq("Đủ tín hiệu"), ["evidence_in_report", "status"]] = ["Bốn nhóm giao cờ có tỷ lệ y90 không đơn điệu; chênh lệch ứng dụng còn sau phân tầng. Chưa đo chất lượng ngoài thời gian.", "Có giả thuyết để kiểm tra, chưa xác nhận đầu vào tại t0"]
     suitability.loc[suitability.criterion.eq("Đủ tín hiệu"), "remaining_condition"] = "Kiểm tra giá trị bổ sung so với Logistic Regression mạnh. Các chỉ báo thiếu hồ sơ có liên hệ chồng lặp, không được cộng bằng chứng độc lập."
     questions = by_key["open_questions"]["tables"][0][1]
-    questions.iloc[2, 4] = "Đối chiếu giới hạn 365 ngày ở mọi nhóm năm và mốc booking cuối. Nghiên cứu dùng giả định theo dõi đủ 365 ngày; đồng thời tìm tài liệu xác nhận NDF thực sự được theo dõi đủ thời hạn."
-    questions.iloc[2, 5] = "Cho phép nghiên cứu nhãn y90 có điều kiện ngay; trước triển khai phải lưu xác nhận chính thức cơ chế theo dõi. Báo cả kịch bản bỏ giả định NDF và loại ngoại lệ ngày âm."
+    questions.iloc[0, 4] = "Đối chiếu B12–B14 về luồng đăng ký, độ mới của nhóm train/test và ứng viên cập nhật hồ sơ. Đây là kiểm tra gián tiếp; để đóng Q1 cần lịch sử hồ sơ hoặc tài liệu sự kiện xác nhận từng giá trị có trước t0."
+    questions.iloc[0, 5] = "Nhánh chính không dùng hai cờ hồ sơ. Nhánh có tuổi/giới tính/cờ chỉ được fit sau khi có bằng chứng Q1. Mọi cột khác cũng cần kiểm tra khả dụng; không suy từ tên cột thành bằng chứng đã xác nhận."
+    questions.iloc[2, 4] = "Đối chiếu B15 theo tháng và mốc lịch giả định; tìm tài liệu xác nhận NDF được theo dõi ít nhất 90 ngày. Không yêu cầu mọi người đủ 365 ngày."
+    questions.iloc[2, 5] = "Cho phép nghiên cứu có điều kiện trên giả định tối thiểu 90 ngày; trước triển khai phải xác nhận cơ chế theo dõi. Độ nhạy B16 giữ nguyên mẫu người dùng, không chọn riêng người đã đặt chỗ."
     questions.iloc[2, 6] = "Giả thuyết được dữ liệu ủng hộ; đã dùng làm giả định nghiên cứu, chưa xác nhận chính thức"
-    by_key["open_questions"]["text"] += "\n\nQ3 đã có bằng chứng định lượng mạnh và không còn chặn việc xây dựng nhãn nghiên cứu 90 ngày có điều kiện. Trạng thái chưa xác nhận chính thức chỉ giới hạn mức kết luận và triển khai."
-    by_key["implications"]["tables"][0][1].iloc[0, 1:3] = ["Nghiên cứu nhãn y90 dưới giả định theo dõi 365 ngày", "Báo độ nhạy theo Q3; xác nhận cơ chế trước triển khai"]
+    by_key["open_questions"]["text"] += "\n\nB15 chưa cho thấy mức bao phủ 90 ngày giảm ở cuối train trong người đã đặt chỗ. Điều này chưa xác nhận theo dõi NDF. Giả định tối thiểu 90 ngày được công khai và B16 định lượng độ nhạy sai nhãn trên cùng mẫu; xác nhận cơ chế vẫn cần trước triển khai."
+    by_key["implications"]["tables"][0][1].iloc[0, 1:3] = ["Nghiên cứu y90 dưới giả định theo dõi ít nhất 90 ngày", "Kiểm tra tháng và độ nhạy sai nhãn NDF trên cùng mẫu người dùng"]
     problem = by_key["problem"]
     problem["text"] = """Bài toán nghiên cứu chính là ước lượng xác suất người dùng mới có lượt đặt chỗ đầu tiên trong 90 ngày kể từ lúc đăng ký. Thời điểm dự đoán t0 là ngay sau khi tạo tài khoản.
 
-Nhãn y90 được xây dựng có điều kiện dưới giả định mỗi người được theo dõi đủ 365 ngày. Cột điểm đến gốc vẫn xác định nhãn y để mô tả bộ dữ liệu; y và y90 là hai mục tiêu khác nhau. Các bảng EDA cũ tiếp tục ghi rõ nhãn y, còn thiết kế mô hình và bảng B7 dùng y90. Quy tắc và mẫu số của y90 nằm ở B9.
+Nhãn y90 được xây dựng dưới giả định NDF được theo dõi ít nhất 90 ngày. Cột điểm đến gốc vẫn xác định nhãn y để mô tả bộ dữ liệu; y và y90 là hai mục tiêu khác nhau. Thiết kế mô hình và bảng B7 dùng y90. Quy tắc và mẫu số nằm ở B9.
 
 Thông tin đầu vào chỉ hợp lệ nếu phản ánh hồ sơ tại t0. Các cột ngày đặt chỗ, cờ thiếu ngày đặt chỗ và nhật ký chưa có thời điểm sự kiện bị loại khỏi thiết kế chính. Các ngoại lệ ngày đặt chỗ âm được giữ trong EDA nhãn y nhưng chưa gán y90."""
     glossary = by_key["glossary"]["tables"][0][1]
-    by_key["glossary"]["text"] = by_key["glossary"]["text"].replace("“nhãn y” cho mục tiêu nhị phân", "“nhãn y” cho kết quả gốc và “nhãn y90” cho mục tiêu nghiên cứu 90 ngày")
-    glossary.loc[len(glossary)] = ["Nhãn y90", "Nhãn nghiên cứu 90 ngày có điều kiện: 1 nếu độ trễ từ 0 đến 90; 0 nếu muộn hơn hoặc NDF dưới giả định theo dõi đủ 365 ngày. Ngoại lệ ngày âm chưa gán nhãn."]
-    glossary.loc[len(glossary)] = ["Khoảng đệm thời gian (embargo)", "Khoảng ngày đăng ký bị bỏ khỏi tập trước để nhãn 90 ngày hoàn tất trước khi dự đoán tập sau. Ở đây đệm 90 ngày lịch và chỉ dùng nhãn đã có trước mốc dự đoán."]
+    by_key["glossary"]["text"] = by_key["glossary"]["text"].replace("“nhãn y” cho mục tiêu nhị phân và", "“nhãn y” cho kết quả gốc, “nhãn y90” cho mục tiêu nghiên cứu 90 ngày và")
+    glossary.loc[len(glossary)] = ["Nhãn y90", "1 nếu độ trễ từ 0 đến 90 ngày; 0 nếu muộn hơn hoặc NDF dưới giả định theo dõi ít nhất 90 ngày. Ngoại lệ ngày âm chưa gán."]
+    glossary.loc[len(glossary)] = ["Nhãn đã hoàn tất tại mốc tháng", "Chỉ dùng người có ngày đăng ký + 90 ngày nhỏ hơn mốc dự đoán. Mô hình tại mỗi mốc học trên toàn bộ nhãn hợp lệ đã hoàn tất."]
+    glossary.loc[len(glossary)] = ["LR (Logistic Regression)", "Hồi quy logistic, mô hình đối chứng ước lượng xác suất. Phiên bản có tương tác cặp cho phép ảnh hưởng của một biến thay đổi theo biến khác."]
+    glossary.loc[len(glossary)] = ["OOF theo thời gian", "Dự đoán ngoài tập học: mô hình tạo điểm cho một người chỉ học nhãn đã sẵn có trước mốc lịch sử của người đó. Người được chấm không thuộc tập học tạo điểm."]
+    glossary.loc[len(glossary)] = ["Hiệu chỉnh xác suất", "Điều chỉnh điểm dự đoán để xác suất phù hợp hơn với tỷ lệ thực tế, dùng dữ liệu ngoài tập học của mô hình tạo điểm."]
+    glossary.loc[len(glossary)] = ["ECE", "Sai lệch hiệu chỉnh kỳ vọng: chia dự đoán thành các nhóm, lấy trung bình có trọng số của chênh lệch tuyệt đối giữa xác suất trung bình và tỷ lệ dương từng nhóm. Thiết kế dùng 10 nhóm đồng số mẫu."]
     revise_research_design(report, by_key, contrast)
     revise_executive(report, by_key, summary90, profile_summary, apps)
-    report.facts.update({"research_revision": REVISION, "primary_target": "conditional_first_booking_within_90_days_assuming_365_day_followup",
-                         "followup_assumption_days": 365, "conditional_90_positive": positive,
+    report.facts.update({"research_revision": REVISION, "primary_target": "conditional_first_booking_within_90_days_assuming_minimum_90_day_followup",
+                         "followup_assumption_days": 90, "conditional_90_positive": positive,
                          "conditional_90_eligible": eligible, "conditional_90_unassigned": unknown,
                          "conditional_90_rate_pct": positive/eligible*100, "conditional_90_fraction_all_rows_pct": positive/len(train)*100,
-                         "age_gender_missing_cramers_v_2014": float(profile_summary.iloc[0,-1]),
-                         "protocol_embargo_calendar_days": 90})
+                         "age_gender_missing_cramers_v_2014": float(profile_summary['V giữa hai cờ thiếu hồ sơ'].iloc[0]),
+                         "label_maturity_days": 90, "main_t0_columns": list(MAIN_T0_COLUMNS),
+                         "development_monthly_origins": 6, "final_monthly_origins": 2})
     report.facts["base_evidence_fingerprint"] = report.facts["statistical_fingerprint"]
     capture_evidence(report, {**report.airbnb_evidence, "protocol": protocol, "conditional_label_summary": summary90,
                              "conditional_label_rules": construction, "conditional_label_sensitivity": sensitivity,
                              "profile_summary": profile_summary, "profile_overlap": overlap, "profile_apps": apps,
-                             "descriptive_baseline_contrast": contrast})
-    report.research_tables = {"B9": summary90, "B10": profile_summary, "B11": apps}
+                             "descriptive_baseline_contrast": contrast, "signup_profile": signup, "cohort_missing_train_test": cohort_missing,
+                             "profile_action_audit": profile_actions, "profile_update_strata": update_strata,
+                             "monthly_observed_coverage": monthly_coverage, "calendar_followup": calendar_followup})
+    report.research_tables = {"B9": summary90, "B10": profile_display, "B11": apps,
+                              "B15": monthly_coverage, "B16": sensitivity, "B17": by_key["algorithms"]["tables"][0][1]}
     report.airbnb_context["y90"] = labels
 
 
 def plot_profiles(report, recent, apps, section):
     fig, axes = plt.subplots(1, 2, figsize=(15, 5.4), layout="constrained")
-    overlap = pd.crosstab(recent.age_missing, recent.gender_unknown)
-    axes[0].imshow(overlap, cmap="Blues")
-    axes[0].set_xticks([0,1], ["Có khai báo giới tính", "Không rõ giới tính"])
-    axes[0].set_yticks([0,1], ["Có tuổi", "Thiếu tuổi"])
-    axes[0].set_title("Hai chỉ báo thiếu hồ sơ · năm 2014")
-    for i in range(2):
-        for j in range(2):
-            axes[0].text(j, i, f"n={overlap.iloc[i,j]:,}", ha="center", va="center",
-                         color="white" if overlap.iloc[i,j] > 20000 else "#172a35", fontsize=12)
+    overlap = rates_two_targets(recent, ["age_missing", "gender_unknown"])
+    axes[0].errorbar(overlap.rate90, range(len(overlap)),
+                    xerr=np.vstack([overlap.rate90-overlap.lower90, overlap.upper90-overlap.rate90]),
+                    fmt="o", capsize=4, color="#C76A37")
+    axes[0].set_yticks(range(len(overlap)), [f"{'Thiếu tuổi' if r.age_missing else 'Có tuổi'} / {'không rõ giới tính' if r.gender_unknown else 'có giới tính'}\nn={r.n90:,}" for r in overlap.itertuples()])
+    axes[0].set(xlim=(0,100), xlabel="Có lượt đặt chỗ trong 90 ngày (%)", title="Bốn nhóm hồ sơ không tạo thành một thang đơn điệu")
+    axes[0].grid(axis="x", alpha=.2)
     complete = apps[~apps.age_missing & ~apps.gender_unknown]
     x = np.arange(len(complete))
     axes[1].errorbar(complete.rate90, x,
@@ -258,53 +372,88 @@ def plot_profiles(report, recent, apps, section):
     path = report.savefig("profile_completeness", fig)
     section["figures"] = [path]
     report.figure_notes[path.name] = (
-        "**Quan sát:** thiếu tuổi thường đi cùng tình trạng không rõ giới tính. Chênh lệch ứng dụng vẫn xuất hiện trong nhóm có đủ hai thông tin này.\n\n"
-        "**Phạm vi và cách đọc:** bên trái là số người dùng trong bốn ô hồ sơ. Bên phải là nhãn y90 dưới giả định theo dõi 365 ngày, "
-        "chỉ trong nhóm có tuổi và có khai báo giới tính, với khoảng Wilson 95%. Bảng B11 giữ cả bốn mức đầy đủ hồ sơ. "
+        "**Quan sát:** có tuổi nhưng không rõ giới tính là nhóm có tỷ lệ y90 cao nhất, vượt nhóm có cả hai thông tin. Chênh lệch ứng dụng còn trong nhóm có tuổi và có khai báo giới tính.\n\n"
+        "**Phạm vi và cách đọc:** cả hai hình dùng y90 dưới giả định theo dõi NDF ít nhất 90 ngày và khoảng Wilson 95%. Bảng B11 giữ cả bốn nhóm giao cờ. "
         "Đây là phân tầng mô tả, chưa kiểm soát mọi khác biệt và chưa xác nhận thông tin có sẵn tại t0."
     )
 
 
+def plot_followup_and_cohorts(report, monthly, cohorts, section):
+    fig, axes = plt.subplots(1,2,figsize=(15,5.2),layout="constrained")
+    rate = monthly.iloc[:,4].to_numpy()
+    axes[0].errorbar(monthly.iloc[:,0], rate, yerr=np.vstack([rate-monthly.iloc[:,5],monthly.iloc[:,6]-rate]),fmt="o-",capsize=4,color="#245D80")
+    axes[0].set(title="Mức bao phủ 90 ngày trong người đã đặt chỗ",ylabel="Trong 90 ngày (%)",ylim=(70,95))
+    axes[0].tick_params(axis="x",rotation=30)
+    recent = cohorts[cohorts.month.ge("2013-07")]
+    for source, style in [("Train","-"),("Test","--")]:
+        data = recent[recent.source.eq(source)]
+        for field, label, color in [("age_missing_pct","Thiếu tuổi","#245D80"),("gender_unknown_pct","Không rõ giới tính","#C76A37")]:
+            axes[1].plot(data.month,data[field],style,marker="o",color=color,label=f"{label} · {source}")
+    axes[1].set(title="Thiếu hồ sơ theo tháng, gồm test không có nhãn",ylabel="Người dùng trong tháng (%)",ylim=(25,70))
+    axes[1].tick_params(axis="x",rotation=60,labelsize=8)
+    axes[1].legend(fontsize=8)
+    path=report.savefig("followup_profile_cohorts",fig)
+    section["figures"]=[path]
+    report.figure_notes[path.name] = "**Quan sát:** mức bao phủ trong người đã đặt chỗ không giảm dần ở các tháng cuối train; tỷ lệ thiếu hồ sơ khác nhau giữa các tháng và giữa train/test.\n\n**Phạm vi và cách đọc:** hình trái chỉ có người đã đặt chỗ với độ trễ hợp lệ, nên chưa xác nhận theo dõi NDF. Hình phải dùng mọi người trong từng tháng, kể cả test không có nhãn. Mức độ mới của tháng và cơ cấu luồng đăng ký cùng thay đổi; không diễn giải xu hướng thành bằng chứng thời điểm cập nhật hồ sơ."
+
+
 def revise_research_design(report, by_key, contrast):
+    from scripts.eda_diagnostics import section
+    branches = pd.DataFrame([
+        ["A0 · Nhánh chính tối thiểu", "Ngày tạo tài khoản; các thông tin lịch suy ra từ t0", "Mốc tạo tài khoản có ngay khi sự kiện hoàn tất. Không dùng tuổi, giới tính, cờ thiếu, kênh hay nhật ký.", "Có thể đặc tả độc lập với Q1; chưa huấn luyện"],
+        ["A1 · Mở rộng sự kiện đăng ký", "Cách đăng ký, luồng đăng ký, ứng dụng đăng ký", "Chỉ mở khi tài liệu hoặc hợp đồng dữ liệu xác nhận chúng được ghi tại sự kiện tạo tài khoản. CSV và tên cột chưa đủ chứng minh lịch sử bất biến.", "Chờ kiểm tra nguồn; nếu chưa xác nhận thì giữ A0"],
+        ["B · Hồ sơ có điều kiện", "Tuổi, giới tính, hai cờ thiếu và các tương tác liên quan", "Q1 là điều kiện chặn. Cần lịch sử hoặc mô tả trích xuất xác nhận tại t0. Các bảng gián tiếp chưa đáp ứng điều kiện này.", "Không dùng trong nhánh chính khi Q1 còn mở"],
+        ["C · Kênh/thiết bị có điều kiện", "Kênh tiếp cận, nhà cung cấp, thiết bị và các thuộc tính khác", "Chỉ thêm từng cột có bằng chứng tại t0; không mặc định mọi hồ sơ thô là thông tin đăng ký.", "Khai báo rõ danh sách cột được chấp nhận trước mỗi thí nghiệm"],
+    ], columns=["Nhánh", "Thông tin", "Căn cứ và điều kiện", "Trạng thái hiện tại"])
     models = pd.DataFrame([
-        ["Xác suất hằng", "Tỷ lệ y90 trong mỗi tập học", "Chỉ là mốc kiểm tra cơ bản"],
-        ["Logistic Regression L2 · hồ sơ tối giản", "Cờ thiếu tuổi và cờ không rõ giới tính", "Đo mức tín hiệu dễ khai thác; kiểm tra bỏ lần lượt từng cờ"],
-        ["Logistic Regression L2 · ít biến mạnh", "Hai cờ hồ sơ, ứng dụng đăng ký, kênh tiếp cận, cách đăng ký", "Baseline mạnh bắt buộc; mã hóa và chọn điều chuẩn trong tập học/kiểm định"],
-        ["Logistic Regression L2 · cùng đầu vào", "Cùng tập biến hợp lệ tại t0 với CatBoost", "So sánh công bằng về nguồn thông tin; baseline chính là LR tốt nhất được chọn trên các lượt kiểm định"],
-        ["CatBoost", "Cùng thông tin hợp lệ tại t0", "Chỉ chấp nhận nếu tăng giá trị so với LR đã chọn; kiểm tra bỏ cờ hồ sơ và ứng dụng"],
-        ["Hiệu chỉnh sigmoid", "Áp dụng riêng cho từng ứng viên đã cố định", "Cùng cửa sổ hiệu chỉnh, cùng cửa sổ đánh giá; không ưu tiên riêng CatBoost"],
+        ["Xác suất hằng", "Tỷ lệ y90 trong tập học tại mốc tháng", "Đối chứng cơ bản trong mỗi nhánh"],
+        ["LR L2 · hiệu ứng chính", "Chỉ các cột đã được chấp nhận của nhánh", "Không dùng hai cờ để định nghĩa baseline chính khi Q1 chưa đóng"],
+        ["LR L2 · tương tác cặp", "Các cột trên và one-hot cặp nhóm được chấp nhận", "A1: ứng dụng × cách/luồng đăng ký; B: cờ × ứng dụng, cờ × cờ; C: ứng dụng × kênh. Chỉ tạo cặp khi cả hai cột hợp lệ tại t0."],
+        ["CatBoost", "Cùng nguồn thông tin được chấp nhận với LR", "Phải so với LR tốt nhất gồm cả cấu hình có tương tác; chọn bằng các tháng phát triển"],
+        ["Hiệu chỉnh sigmoid từ OOF theo thời gian", "Dự đoán lịch sử ngoài tập học, có nhãn đã hoàn tất tại mốc hiện tại", "Áp dụng cùng quy trình cho LR và CatBoost; không hiệu chỉnh bằng dự đoán trong mẫu"],
     ], columns=["Ứng viên", "Thông tin sử dụng", "Vai trò và kiểm soát"])
-    by_key["algorithms"]["text"] = """Thiết kế mô hình dùng nhãn y90 có điều kiện dưới giả định theo dõi đủ 365 ngày. Xác suất hằng chỉ là mốc kiểm tra tối thiểu. Đối chứng quyết định giá trị của CatBoost là Logistic Regression L2 mạnh, gồm một cấu hình ít biến và một cấu hình có cùng đầu vào với CatBoost. Baseline LR được chọn bằng các lượt kiểm định có khoảng đệm, trước khi dùng tập cuối.
+    by_key["algorithms"]["text"] = """Thiết kế tách tính hợp lệ của đầu vào khỏi độ mạnh liên hệ. Nhánh chính A0 không phụ thuộc hồ sơ và hai cờ thiếu. A1 chỉ mở rộng bằng thông tin sự kiện đăng ký được xác nhận; B và C là nhánh có điều kiện. Không thể gọi một cột chắc chắn có tại t0 chỉ vì tên cột gợi ý như vậy. Mọi kết quả của B khi Q1 còn mở chỉ là phân tích mô tả, không thay thế đối chứng của A0/A1.
 
-Hai cờ hồ sơ có liên hệ mạnh nên cần kiểm tra loại lần lượt cờ thiếu tuổi, cờ không rõ giới tính, rồi ứng dụng đăng ký. Mọi xử lý thiếu, mã hóa và thống kê dựa nhãn chỉ học trên tập học. Chưa huấn luyện mô hình, tính AUC hoặc tối ưu tham số trong báo cáo này."""
-    by_key["algorithms"]["tables"] = [("Đối chứng từ đơn giản đến mạnh và so sánh công bằng", models)]
-    by_key["algorithms"]["tables"].append(("Đối chiếu mô tả: mức tín hiệu chỉ từ tình trạng thiếu tuổi", contrast))
-    by_key["algorithms"]["text"] += "\n\nBảng entropy bên dưới tính từ tỷ lệ của hai nhóm tuổi trên chính mẫu năm 2014. Đây là phép tính mô tả cùng mẫu, có xu hướng lạc quan, không phải log loss kiểm định hoặc kết quả mô hình. Lift top 20% là kỳ vọng khi chọn ngẫu nhiên trong nhóm có tỷ lệ cao nhất, vì nhóm đó lớn hơn 20% mẫu. Nó cho thấy ngưỡng cũ so với xác suất hằng dễ đạt, nhưng không chứng minh một mô hình đã đạt ngoài thời gian."
-    by_key["evaluation"]["text"] = """Bảng B7 dùng nhãn y90 và có khoảng đệm 90 ngày lịch trước mỗi cửa sổ kiểm định, trước hiệu chỉnh và giữa hiệu chỉnh với đánh giá cuối. Ngày thứ 90 được tính vào nhãn. Vì CSV chỉ chính xác đến ngày, nhãn chỉ được dùng khi ngày đăng ký + 90 ngày nhỏ hơn mốc dự đoán. Cột ngày nhãn sẵn có tương ứng ngày đăng ký cuối + 91 ngày.
+Trong mỗi nhánh hợp lệ, so sánh xác suất hằng, LR có hiệu ứng chính, LR có tương tác cặp và CatBoost. Các cặp ứng dụng × cờ và ứng dụng × kênh giúp LR biểu diễn chênh lệch đã thấy ở B11. Mã hóa cặp, xử lý nhóm hiếm và điều chuẩn L2 chỉ học/chọn trên lịch sử phát triển. Nếu one-hot giới tính đã chứa chỉ báo unknown thì không thêm một cột trùng hệt. CatBoost được so với LR tốt nhất trên cùng thông tin và cùng lịch đánh giá, không chỉ LR thiếu tương tác.
 
-Ba lượt kiểm định kết thúc ở các nhóm đăng ký tháng 1–3/2013, tháng 7–8/2013 và tháng 9 đến 2013-10-02. Nhãn của lượt cuối sẵn có từ 2014-01-01. Khi đó chốt cấu hình và huấn luyện lại với người đăng ký đến 2013-10-02. Hiệu chỉnh dùng người đăng ký từ 2014-01-01 đến 2014-01-30. Nhãn hiệu chỉnh hoàn tất trước mốc đánh giá 2014-05-01; ngày đăng ký 2014-01-31 đến 2014-04-30 nằm trong khoảng đệm.
+Chưa huấn luyện hoặc ước lượng chất lượng mô hình trong báo cáo. Phân tích entropy từ cờ hồ sơ được chuyển xuống phụ lục; nó không định nghĩa nhánh chính hoặc xác nhận tính khả dụng tại t0."""
+    by_key["algorithms"]["tables"] = [("B17 · Các nhánh đầu vào và điều kiện tại t0", branches), ("Đối chứng có tương tác trong từng nhánh hợp lệ", models)]
+    by_key["appendix"]["blocks"].append(section("profile_entropy_only", "Entropy hồ sơ: mô tả có điều kiện", "Đây là entropy và lift kỳ vọng trên cùng mẫu năm 2014, không phải kết quả kiểm định. Hai cờ chưa hợp lệ tại t0 khi Q1 còn mở, nên bảng không chứng minh một baseline có thể sử dụng. Không dùng bảng này để chọn hoặc chấp nhận nhánh chính.", [("Đối chiếu mô tả theo tình trạng thiếu tuổi", contrast)]))
+    decisions = by_key["column_decisions"]["tables"][0][1]
+    for column in ["age", "gender"]:
+        mask = decisions["Cột gốc"].eq(column) & decisions["Bảng dữ liệu"].eq("Hồ sơ người dùng")
+        decisions.loc[mask, "Quyết định cho thiết kế chính"] = "Ngoài nhánh chính; chỉ nhánh B sau xác nhận Q1, gồm cả cờ thiếu"
+    for column in REGISTRATION_EXTENSION:
+        decisions.loc[decisions["Cột gốc"].eq(column), "Quyết định cho thiết kế chính"] = "Nhánh A1 chỉ sau bằng chứng của sự kiện đăng ký; hiện chưa xác nhận từ CSV"
+    by_key["column_decision_summary"]["tables"][0] = ("Tóm tắt quyết định sử dụng dữ liệu", decisions.groupby(["Bảng dữ liệu","Quyết định cho thiết kế chính"],sort=False).size().reset_index(name="Số cột"))
+    by_key["evaluation"]["text"] = """B7 thay các cửa sổ không đều bằng mốc dự đoán đầu mỗi tháng. Sáu tháng 7–12/2013 phục vụ phát triển; các nhãn này đã hoàn tất trước khi chốt cấu hình vào 2014-05-01. Hai tháng 5 và 6/2014 là các lượt đánh giá cuối. Báo điểm từng tháng và điểm gộp theo số người; không để một cửa sổ nhỏ riêng quyết định mô hình.
 
-Đánh giá cuối dùng người đăng ký tháng 5–6/2014 và chỉ tính kết quả sau khi nhãn hoàn tất từ 2014-09-29. Không đưa người trong khoảng đệm vào tập trước, kể cả người đã đặt chỗ sớm, để tránh chọn mẫu theo kết quả. Các số lượng chỉ là kiểm kê cửa sổ trên mẫu y90 hợp lệ, chưa xuất tập chia hoặc huấn luyện.
+Tại mốc O, học lại trên mọi người có nhãn hợp lệ và ngày đăng ký + 90 ngày < O. Vì nhãn gồm ngày thứ 90 và CSV chỉ ghi ngày, thời điểm sẵn có là ngày đăng ký + 91 ngày. Tại 2014-05-01, dùng dữ liệu đăng ký đến 2014-01-30; tại 2014-06-01, dùng đến 2014-03-02. Chỉ người chưa hoàn tất nhãn bị loại khỏi tập học. Không giữ thêm khoảng đệm riêng giữa tập học cuối và dữ liệu hiệu chỉnh.
 
-[TimeSeriesSplit của scikit-learn](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.TimeSeriesSplit.html) có tham số gap tính theo số dòng. Thiết kế ở đây dùng ngày lịch vì số người đăng ký mỗi ngày không đều. Khoảng đệm bảo đảm thứ tự nhãn theo giả định đã nêu; mọi độ trễ cập nhật dữ liệu thực tế cần được cộng thêm khi có bằng chứng."""
+Hiệu chỉnh dùng dự đoán OOF theo thời gian của các nhóm đăng ký trong 90 ngày gần nhất đã hoàn tất nhãn tại O. Mỗi dự đoán OOF phải được tạo bởi mô hình chỉ học các nhãn đã có trước đầu tháng đăng ký của chính người đó; người đó không thuộc tập học tạo dự đoán. Bộ hiệu chỉnh sigmoid học trên các dự đoán lịch sử này, rồi áp dụng cho mô hình nền được học lại trên toàn bộ nhãn đã hoàn tất tại O. Nhãn hiệu chỉnh có thể nằm trong tập học của mô hình nền cuối; điều bắt buộc là điểm dùng học bộ hiệu chỉnh phải là OOF. Đây là thiết kế đề xuất, chưa sinh dự đoán OOF hay fit bộ hiệu chỉnh.
+
+Độ dài cửa sổ, dạng tương tác, điều chuẩn và phương pháp hiệu chỉnh được chốt bằng các tháng phát triển trước 2014-05-01. Tháng 6 chỉ học lại với nhãn mới đã hoàn tất, không chỉnh cấu hình theo kết quả cuối tháng 5. Khi dự đoán tháng 6, nhãn tháng 5 chưa hoàn tất nên không được dùng. Cần kiểm tra sự chuyển đổi từ điểm OOF của mô hình cũ sang mô hình học lại trong các tháng phát triển; không giả định hiệu chỉnh tự chuyển giao hoàn hảo.
+
+[Tài liệu hiệu chỉnh của scikit-learn](https://scikit-learn.org/stable/modules/calibration.html) mô tả dùng dự đoán ngoài tập học để học bộ hiệu chỉnh. Ở đây việc tạo điểm ngoài tập học phải tuân thủ mốc thời gian và độ trễ nhãn, thay vì chia ngẫu nhiên. Toàn bộ chất lượng và ngưỡng dưới đây còn phải được đo sau khi huấn luyện."""
     criteria = pd.DataFrame([
-        ["Toàn vẹn và thời gian", "0 ID giao nhau trong mỗi lượt; ngày đăng ký + 90 < mốc dự đoán cho mọi nhãn dùng học; loại 29 ngoại lệ khỏi y90", "Kiểm tra cả học, hiệu chỉnh và thời điểm chọn cấu hình"],
+        ["Toàn vẹn và khả dụng · điều kiện chặn", "0 biến kết quả hoặc log chưa chứng minh trước t0; 0 thuộc tính/cờ chưa có bằng chứng tại t0 trong nhánh được fit; 0 ID giao giữa học và tháng dự đoán", "Q1 chưa đóng thì nhánh B không được fit hoặc dùng để thay thế nhánh chính. Chặn cả LR và CatBoost nếu vi phạm."],
+        ["Thứ tự nhãn và hiệu chỉnh", "Mọi nhãn dùng học hoặc hiệu chỉnh phải hoàn tất trước O; mọi điểm học bộ hiệu chỉnh phải là OOF theo thời gian", "Loại 29 ngoại lệ khỏi y90; dùng toàn bộ nhãn hợp lệ đã hoàn tất, không chọn theo việc đặt chỗ sớm"],
+        ["Xác suất · chuẩn bắt buộc cho mọi mô hình", "Sai lệch tuyệt đối giữa xác suất trung bình và tỷ lệ y90 ≤2 điểm phần trăm; ECE 10 nhóm đồng số mẫu ≤3 điểm phần trăm", "Áp dụng cho cả LR lẫn CatBoost sau hiệu chỉnh, trên từng tháng cuối n≥100 và tập gộp. Báo khoảng tin cậy và biểu đồ độ tin cậy. Nếu cả hai không đạt thì chưa có mô hình được chấp nhận."],
         ["Giá trị bổ sung · tiêu chí chính", "Log loss CatBoost giảm ít nhất 1% tương đối so với baseline LR mạnh đã chọn; cận trên 95% của chênh log loss (CatBoost − LR) < 0", "So sánh ghép cặp trên cùng người, cùng mẫu y90 và cùng hiệu chỉnh; bootstrap theo người dùng"],
         ["Ưu tiên top 20%", "Lift@20% tăng ít nhất 5% tương đối so với LR; cận dưới 95% của chênh lift > 0", "Ngân sách 20% và mức 5% là đề xuất nghiên cứu; ngưỡng tuyệt đối 1.20 chỉ còn là thông tin tham khảo"],
         ["Phân biệt và xác suất", "AP không thấp hơn LR trên điểm ước lượng; báo ROC-AUC, Brier và độ hiệu chỉnh cho cả hai", "Brier không kém LR quá 0.002 tuyệt đối; báo khoảng tin cậy của chênh lệch"],
-        ["Hiệu chỉnh", "Báo sai lệch xác suất trung bình, ECE 10 nhóm đồng số mẫu và biểu đồ độ tin cậy cho cả LR và CatBoost", "Không lấy riêng log loss hoặc ECE làm bằng chứng đầy đủ về hiệu chỉnh"],
         ["Độ bền và chồng lặp tín hiệu", "Báo chênh log loss với LR trong từng tháng và từng nhóm đủ/thiếu hồ sơ; kiểm tra bỏ từng cờ và ứng dụng", "Nếu giá trị bổ sung không ổn định hoặc không đạt, ưu tiên LR đơn giản hơn"],
     ], columns=["Tiêu chí", "Điều kiện chấp nhận đề xuất", "Cách diễn giải"])
-    by_key["acceptance"]["text"] = """Các ngưỡng dưới đây là đề xuất đặt trước cho giá trị bổ sung của CatBoost so với Logistic Regression mạnh. Chúng không phải kết quả đã đo hoặc chuẩn phổ quát. Thay đổi đối chứng là điểm chính; chỉ tăng một ngưỡng so với xác suất hằng vẫn chưa đủ. Mức giảm log loss 2% so với hằng và lift tuyệt đối 1.20 của bản trước không còn dùng để chấp nhận CatBoost. Chọn LR đối chứng và bộ tham số bằng dữ liệu phát triển, không chọn theo tập cuối."""
+    by_key["acceptance"]["text"] = """Trước tiên, mọi ứng viên phải qua điều kiện t0, thứ tự nhãn và chuẩn xác suất tuyệt đối. Sau đó mới xét giá trị bổ sung của CatBoost so với LR tốt nhất, gồm cả LR có tương tác, trong cùng nhánh hợp lệ. Nếu CatBoost không đạt, LR chỉ được dùng khi chính LR qua các điều kiện bắt buộc. Nếu không ứng viên nào đạt thì báo chưa có mô hình được chấp nhận. Các ngưỡng là đề xuất đặt trước, chưa phải kết quả đã đo hoặc chuẩn phổ quát."""
     by_key["acceptance"]["tables"] = [("Điều kiện để CatBoost được chấp nhận thay cho LR", criteria)]
 
 
 def research_roles():
     return pd.DataFrame([
-        ["Chọn cấu hình", "Ba lượt kiểm định trong năm 2013", "Nhãn lượt cuối sẵn có từ 2014-01-01; lúc đó mới chốt mô hình và LR đối chứng"],
-        ["Huấn luyện lại", "Người đăng ký đến 2013-10-02", "Đệm 2013-10-03 đến 2013-12-31; dự đoán hiệu chỉnh từ 2014-01-01"],
-        ["Hiệu chỉnh", "Người đăng ký 2014-01-01 đến 2014-01-30", "Đệm 2014-01-31 đến 2014-04-30; mô hình nền giữ cố định"],
-        ["Đánh giá cuối", "Người đăng ký 2014-05-01 đến 2014-06-30", "Mô hình và bộ hiệu chỉnh cố định trước 2014-05-01; kết quả hoàn tất từ 2014-09-29"],
+        ["Chọn cấu hình", "Mốc đầu tháng 7–12/2013", "Tổng hợp mọi tháng phát triển đã hoàn tất nhãn; chốt cấu hình, nhánh đầu vào và quy trình hiệu chỉnh trước 2014-05-01"],
+        ["Học lại tại từng mốc", "2014-05-01 và 2014-06-01", "Dùng toàn bộ nhãn hợp lệ đã hoàn tất: đăng ký đến 2014-01-30 và 2014-03-02 tương ứng"],
+        ["Hiệu chỉnh tại từng mốc", "Các nhóm đăng ký trong 90 ngày gần nhất đã hoàn tất nhãn", "Học từ dự đoán lịch sử OOF theo thời gian. Không cần chia thêm khoảng đệm giữa mẫu này và tập học nền cuối; không dùng điểm dự đoán trong mẫu."],
+        ["Đánh giá cuối", "Tháng 5 và tháng 6/2014", "Chỉ cập nhật trọng số mô hình và bộ hiệu chỉnh bằng lịch sử có sẵn; không đổi cấu hình theo kết quả đánh giá cuối"],
         ["Test Kaggle", "Người đăng ký tháng 7–9/2014", "Chỉ kiểm tra cấu trúc và thay đổi phân phối vì không có nhãn"],
     ], columns=["Giai đoạn", "Cửa sổ", "Thời điểm và điều kiện sử dụng"])
 
@@ -319,17 +468,17 @@ def revise_executive(report, by_key, summary90, profile, apps):
     last = next(p for p in old if p.startswith("5. **Phạm vi"))
     findings = [
         first,
-        f"2. **Nhãn nghiên cứu 90 ngày có điều kiện:** có {int(target['Dương tính y90']):,} người đặt chỗ trong 90 ngày, bằng {target['Dương tính trên toàn bộ dòng (%)']:.2f}% toàn bộ {int(target['Toàn bộ người dùng']):,} dòng. Với giả định theo dõi đủ 365 ngày và loại {int(target['Chưa gán nhãn']):,} ngoại lệ chưa gán, mẫu nghiên cứu còn {int(target['Mẫu hợp lệ']):,} người, tỷ lệ dương {target['Dương tính trên mẫu hợp lệ (%)']:.2f}%. Đây là tỷ lệ trên toàn bộ mẫu người dùng tương ứng, khác với mức bao phủ trong nhóm đã đặt chỗ.",
-        f"3. **Tín hiệu chung về độ đầy đủ hồ sơ:** trong năm 2014, FEMALE và MALE có tỷ lệ nhãn y=1 gần như nhau ({prof['FEMALE · nhãn y (%)']:.2f}% và {prof['MALE · nhãn y (%)']:.2f}%). Nhóm không rõ giới tính có tỷ lệ {prof['Không rõ giới tính · nhãn y (%)']:.2f}%. Người có tuổi đạt {prof['Có tuổi · nhãn y (%)']:.2f}%, so với {prof['Thiếu tuổi · nhãn y (%)']:.2f}% ở người thiếu tuổi. Hai cờ thiếu hồ sơ có V={prof['V giữa hai cờ thiếu hồ sơ']:.3f}, nên đây là tín hiệu chồng lặp cần kiểm tra giá trị bổ sung, không phải hai phát hiện dự báo độc lập. Cả hai chỉ được dùng sau khi xác minh tại t0.",
-        f"4. **Chênh lệch ứng dụng sau phân tầng hồ sơ:** trong nhóm năm 2014 có tuổi và có khai báo giới tính, tỷ lệ nhãn y=1 của Web là {complete.loc['Web','source_rate']:.2f}%, iOS {complete.loc['iOS','source_rate']:.2f}% và Android {complete.loc['Android','source_rate']:.2f}%. Chênh lệch vẫn hiện diện sau khi tách hai cờ hồ sơ. Bảng chi tiết báo cả nhãn y và y90 cùng cỡ mẫu; kết quả vẫn là mô tả và chưa kiểm soát mọi khác biệt.",
-        last,
+        f"2. **Nhãn nghiên cứu 90 ngày có điều kiện:** có {int(target['Dương tính y90']):,} người đặt chỗ trong 90 ngày, bằng {target['Dương tính trên toàn bộ dòng (%)']:.2f}% toàn bộ {int(target['Toàn bộ người dùng']):,} dòng. Với giả định NDF được theo dõi ít nhất 90 ngày và loại {int(target['Chưa gán nhãn']):,} ngoại lệ chưa gán, mẫu còn {int(target['Mẫu hợp lệ']):,} người, tỷ lệ dương {target['Dương tính trên mẫu hợp lệ (%)']:.2f}%. Không cần giả định mọi người được theo dõi một năm.",
+        f"3. **Hai cờ hồ sơ có cơ chế cần kiểm tra:** trong năm 2014, nhóm có tuổi nhưng không rõ giới tính có y90={prof['Có tuổi, không rõ giới tính · y90 (%)']:.2f}%, cao hơn nhóm có cả hai thông tin ({prof['Có tuổi, có khai báo giới tính · y90 (%)']:.2f}%). Bốn nhóm không tăng đơn điệu theo mức điền hồ sơ, dù hai cờ có V={prof['V giữa hai cờ thiếu hồ sơ']:.3f}. Chưa thể quy về một tín hiệu đầy đủ chung hoặc xác nhận thời điểm có sẵn. Chúng nằm ngoài nhánh chính và chỉ được dùng sau khi Q1 có bằng chứng.",
+        f"4. **Chênh lệch ứng dụng theo đúng mục tiêu y90:** trong nhóm năm 2014 có tuổi và có khai báo giới tính, Web đạt {complete.loc['Web','rate90']:.2f}%, iOS {complete.loc['iOS','rate90']:.2f}% và Android {complete.loc['Android','rate90']:.2f}%. Các nhóm giao cờ khác có tương quan ứng dụng khác nhau; LR đối chứng phải có tương tác cặp khi các cột được chấp nhận tại t0. Các tỷ lệ này là mô tả, không phải chất lượng của nhánh chính.",
+        last.replace("Tỷ lệ có đặt chỗ", "Tỷ lệ có nhãn y=1 gốc"),
     ]
     next_steps = [
-        "1. **Chốt giả định nhãn và xử lý ngoại lệ.** Cho phép nghiên cứu y90 dưới giả định theo dõi đủ 365 ngày, báo độ nhạy khi không gán âm cho NDF và giữ 29 ngoại lệ ngoài mẫu y90. Q3 cần xác nhận chính thức trước triển khai, thay vì chặn toàn bộ nghiên cứu có điều kiện.",
-        "2. **Chốt thông tin có sẵn tại t0.** Xác minh hồ sơ và các cờ thiếu phản ánh lúc đăng ký. Loại ngày đặt chỗ và cờ thiếu của cột này khỏi đầu vào vì mức khớp nhãn y là 100%. Nhật ký thiếu thời điểm sự kiện vẫn ngoài thiết kế chính.",
-        "3. **Dùng đối chứng mạnh và khoảng đệm.** Chọn cấu hình cùng LR đối chứng trên các lượt kiểm định có đệm 90 ngày. Huấn luyện lại đến 2013-10-02, hiệu chỉnh trên 2014-01-01 đến 2014-01-30, rồi đánh giá tháng 5–6/2014. CatBoost phải tăng giá trị so với LR trên cùng nhãn y90 và cùng cửa sổ, không chỉ vượt xác suất hằng.",
+        "1. **Chốt giả định theo dõi tối thiểu.** Xác nhận NDF được theo dõi ít nhất 90 ngày và giữ 29 ngoại lệ ngoài mẫu y90. Kiểm tra theo tháng và thay đổi giả định sai nhãn NDF trên cùng mẫu người dùng; không dùng riêng nhóm đã đặt chỗ làm độ nhạy hoặc tập học.",
+        "2. **Chặn đầu vào chưa có bằng chứng tại t0.** Nhánh chính tối thiểu dùng mốc tạo tài khoản. Mở rộng từng cột sự kiện đăng ký sau khi có căn cứ nguồn; hai cờ hồ sơ thuộc nhánh B và bị chặn khi Q1 còn mở. Ngày đặt chỗ và cờ thiếu của cột này tiết lộ nhãn y ở 100% trường hợp nên luôn bị loại khỏi đầu vào.",
+        "3. **Đánh giá tại từng mốc tháng.** Tại 2014-05-01 học đến ngày đăng ký 2014-01-30; tại 2014-06-01 học đến 2014-03-02. Mỗi mốc dùng toàn bộ nhãn đã hoàn tất và điểm OOF theo thời gian để hiệu chỉnh. So sánh LR có tương tác với CatBoost trên cùng nhánh; mọi ứng viên phải đạt chuẩn hiệu chỉnh tuyệt đối trước khi được chấp nhận.",
     ]
     by_key["executive"]["text"] = (
-        "**Kết luận:** có thể nghiên cứu xác suất đặt chỗ trong 90 ngày bằng nhãn có điều kiện dưới giả định theo dõi đủ 365 ngày. Thiết kế đánh giá dùng khoảng đệm theo ngày lịch và đối chứng Logistic Regression mạnh để kiểm tra giá trị bổ sung của CatBoost. (Nguồn: bảng B9 và B7.)"
+        "**Kết luận:** nghiên cứu y90 cần giả định NDF được theo dõi ít nhất 90 ngày. Thiết kế chính không phụ thuộc hai cờ hồ sơ chưa xác nhận tại t0, đánh giá theo nhiều mốc tháng và học trên toàn bộ nhãn đã hoàn tất ở từng mốc. (Nguồn: bảng B9, B17 và B7.)"
         + "\n\n**Năm phát hiện chính**\n\n" + "\n\n".join(findings)
         + "\n\n**Ba việc cần giải quyết trước khi huấn luyện**\n\n" + "\n\n".join(next_steps))

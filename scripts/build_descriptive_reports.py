@@ -410,6 +410,7 @@ AIRBNB_MEANINGS = {
 
 def airbnb_report(root):
     from scripts.airbnb_deep_dive import session_action_counts
+    from scripts.airbnb_research_revision import profile_action_counts
     r = Report("AIRBNB", "AIRBNB — Hiểu người dùng mới, lượt đặt chỗ đầu tiên và độ phủ hành vi", root)
     folder = root/"data/raw/AIRBNB"
     train = pd.read_csv(folder/"train_users_2.csv")
@@ -479,10 +480,11 @@ Có booking được ghi nhận: **{count(booked.sum())}/{count(n)} ({pct(booked
     rates.append(("Tuổi theo nhãn — NA giữ là nhóm riêng",rate_table(age_diagnostic,"reported_age_group","observed_booking")))
     r.add("target", "5. Quan hệ giữa hồ sơ đăng ký và nhãn", "Mỗi quan sát là một user train. Khoảng Wilson 95% chỉ phản ánh bất định nhị thức dưới giả định độc lập; không bao gồm sai lệch chọn mẫu, nhãn chưa trưởng thành hoặc khác thời gian theo dõi. Các nhóm n<100 cần thận trọng. Chênh lệch booking rate giữa kênh/app/thiết bị là liên hệ quan sát, không chứng minh kênh làm tăng booking. Phân nhóm tuổi phục vụ so sánh EDA, không tạo feature.",rates)
     # All event records; only per-user descriptive aggregates are held in memory.
-    sess_rows=0; sess_missing=None; sess_unique={}; devices={}; actions={}; per_user=[]; transaction_parts=[]
+    sess_rows=0; sess_missing=None; sess_unique={}; devices={}; actions={}; per_user=[]; transaction_parts=[]; profile_parts=[]
     elapsed_n=0; elapsed_sum=0.; elapsed_min=np.inf; elapsed_max=-np.inf; elapsed_zero=0; elapsed_negative=0
     for chunk in pd.read_csv(folder/"sessions.csv",chunksize=CHUNK_SIZE):
         transaction_parts.extend(session_action_counts(chunk))
+        profile_parts.extend(profile_action_counts(chunk))
         sess_rows+=len(chunk)
         miss=chunk.isna().sum(); sess_missing=miss if sess_missing is None else sess_missing.add(miss,fill_value=0)
         for c in chunk.columns:
@@ -495,6 +497,8 @@ Có booking được ghi nhận: **{count(booked.sum())}/{count(n)} ({pct(booked
         per_user.append(chunk.groupby("user_id",dropna=True).agg(event_n=("device_type","size"),elapsed_nonnull=("secs_elapsed","count"),elapsed_sum=("secs_elapsed","sum")))
     per_user=pd.concat(per_user).groupby(level=0).sum()
     transaction_counts=pd.concat(transaction_parts,ignore_index=True).groupby(["user_id","field","value"],observed=True,sort=False).event_n.sum().reset_index()
+    r.profile_action_counts = pd.concat(profile_parts,ignore_index=True).groupby(["user_id","field","value"],observed=True,sort=False).event_n.sum().reset_index()
+    r.session_user_ids = per_user.index
     ids=set(per_user.index); train_ids=set(train.id); test_ids=set(test.id)
     coverage=pd.DataFrame([["train",len(train),len(ids&train_ids),len(ids&train_ids)/len(train)*100],
                            ["test",len(test),len(ids&test_ids),len(ids&test_ids)/len(test)*100]],columns=["population","users","users_with_sessions","coverage_pct"])
@@ -908,12 +912,12 @@ Ba bộ dữ liệu phù hợp với ba hành vi và ba đơn vị dự đoán k
 | Bộ | Hành vi phù hợp | Đơn vị | Giới hạn quyết định |
 | --- | --- | --- | --- |
 | HOTEL | Hủy/no-show của booking | Booking | Không đồng nghĩa customer churn; cần xác minh snapshot tại thời điểm dự đoán |
-| AIRBNB | Lượt đặt chỗ đầu tiên trong 90 ngày, dưới giả định theo dõi đủ 365 ngày | Người dùng mới | Nhãn y90 có điều kiện; cần xác nhận cơ chế theo dõi và hồ sơ tại t0; sessions thiếu timestamp |
+| AIRBNB | Lượt đặt chỗ đầu tiên trong 90 ngày, dưới giả định NDF được theo dõi ít nhất 90 ngày | Người dùng mới | Nhánh chính không dùng cờ hồ sơ; các nhánh mở rộng cần bằng chứng tại t0; sessions thiếu timestamp |
 | EXPEDIA | Click/booking trong danh sách khách sạn | Cặp search-property | Phù hợp bối cảnh tìm kiếm/xếp hạng; không có ID khách để chấm CRM; thiếu search không click trong train |
 
 Nếu đề tài nhắm đến chuyển đổi khách hàng mới, AIRBNB phù hợp về đơn vị quan sát. Nếu nghiên cứu vận hành hủy booking, HOTEL rõ mục tiêu và nhẹ hơn. Nếu nghiên cứu tương tác với danh sách tìm kiếm, EXPEDIA phù hợp hơn. Không xếp một bộ là tốt nhất cho mọi mục tiêu và không coi mọi cột thô là feature hợp lệ.
 
-Đối với AIRBNB, nhãn y90 có {a.get('conditional_90_positive', 74027):,} trường hợp dương trên toàn bộ {a['rows']:,} dòng ({a.get('conditional_90_fraction_all_rows_pct', 34.6810):.2f}%). Khi để 29 ngoại lệ ngày âm ở trạng thái chưa gán, mẫu nghiên cứu còn {a.get('conditional_90_eligible', 213422):,} người, tỷ lệ dương {a.get('conditional_90_rate_pct', 34.6857):.2f}%. Đây là mục tiêu nghiên cứu dưới giả định mỗi người được theo dõi đủ 365 ngày. Thiết kế dùng khoảng đệm 90 ngày lịch và so sánh CatBoost với Logistic Regression mạnh. Các tỷ lệ theo nhãn y gốc trong phần so sánh ba bộ vẫn được giữ riêng.
+Đối với AIRBNB, nhãn y90 có {a['conditional_90_positive']:,} trường hợp dương trên toàn bộ {a['rows']:,} dòng ({a['conditional_90_fraction_all_rows_pct']:.2f}%). Khi để {a['conditional_90_unassigned']:,} ngoại lệ ngày âm ở trạng thái chưa gán, mẫu nghiên cứu còn {a['conditional_90_eligible']:,} người, tỷ lệ dương {a['conditional_90_rate_pct']:.2f}%. Đây là mục tiêu nghiên cứu dưới giả định NDF được theo dõi ít nhất 90 ngày. Mỗi mốc dự đoán tháng dùng toàn bộ nhãn đã hoàn tất, với hiệu chỉnh từ điểm OOF theo thời gian. Nhánh chính tối thiểu chỉ dùng mốc tạo tài khoản; hai cờ hồ sơ bị chặn khi Q1 còn mở. Trong từng nhánh hợp lệ, CatBoost được so với Logistic Regression gồm cả tương tác cặp; mọi ứng viên phải đạt ngưỡng hiệu chỉnh tuyệt đối. Các tỷ lệ theo nhãn y gốc trong phần so sánh ba bộ vẫn được giữ riêng.
 
 ## 2. Quy mô đã đối chiếu trực tiếp
 

@@ -21,12 +21,12 @@ Ba bộ dữ liệu phù hợp với ba hành vi và ba đơn vị dự đoán k
 | Bộ | Hành vi phù hợp | Đơn vị | Giới hạn quyết định |
 | --- | --- | --- | --- |
 | HOTEL | Hủy/no-show của booking | Booking | Không đồng nghĩa customer churn; cần xác minh snapshot tại thời điểm dự đoán |
-| AIRBNB | Lượt đặt chỗ đầu tiên trong 90 ngày, dưới giả định theo dõi đủ 365 ngày | Người dùng mới | Nhãn y90 có điều kiện; cần xác nhận cơ chế theo dõi và hồ sơ tại t0; sessions thiếu timestamp |
+| AIRBNB | Lượt đặt chỗ đầu tiên trong 90 ngày, dưới giả định NDF được theo dõi ít nhất 90 ngày | Người dùng mới | Nhánh chính không dùng cờ hồ sơ; các nhánh mở rộng cần bằng chứng tại t0; sessions thiếu timestamp |
 | EXPEDIA | Click/booking trong danh sách khách sạn | Cặp search-property | Phù hợp bối cảnh tìm kiếm/xếp hạng; không có ID khách để chấm CRM; thiếu search không click trong train |
 
 Nếu đề tài nhắm đến chuyển đổi khách hàng mới, AIRBNB phù hợp về đơn vị quan sát. Nếu nghiên cứu vận hành hủy booking, HOTEL rõ mục tiêu và nhẹ hơn. Nếu nghiên cứu tương tác với danh sách tìm kiếm, EXPEDIA phù hợp hơn. Không xếp một bộ là tốt nhất cho mọi mục tiêu và không coi mọi cột thô là feature hợp lệ.
 
-Đối với AIRBNB, nhãn y90 có 74,027 trường hợp dương trên toàn bộ 213,451 dòng (34.68%). Khi để 29 ngoại lệ ngày âm ở trạng thái chưa gán, mẫu nghiên cứu còn 213,422 người, tỷ lệ dương 34.69%. Đây là mục tiêu nghiên cứu dưới giả định mỗi người được theo dõi đủ 365 ngày. Thiết kế dùng khoảng đệm 90 ngày lịch và so sánh CatBoost với Logistic Regression mạnh. Các tỷ lệ theo nhãn y gốc trong phần so sánh ba bộ vẫn được giữ riêng.
+Đối với AIRBNB, nhãn y90 có 74,027 trường hợp dương trên toàn bộ 213,451 dòng (34.68%). Khi để 29 ngoại lệ ngày âm ở trạng thái chưa gán, mẫu nghiên cứu còn 213,422 người, tỷ lệ dương 34.69%. Đây là mục tiêu nghiên cứu dưới giả định NDF được theo dõi ít nhất 90 ngày. Mỗi mốc dự đoán tháng dùng toàn bộ nhãn đã hoàn tất, với hiệu chỉnh từ điểm OOF theo thời gian. Nhánh chính tối thiểu chỉ dùng mốc tạo tài khoản; hai cờ hồ sơ bị chặn khi Q1 còn mở. Trong từng nhánh hợp lệ, CatBoost được so với Logistic Regression gồm cả tương tác cặp; mọi ứng viên phải đạt ngưỡng hiệu chỉnh tuyệt đối. Các tỷ lệ theo nhãn y gốc trong phần so sánh ba bộ vẫn được giữ riêng.
 
 ## 2. Quy mô đã đối chiếu trực tiếp
 
