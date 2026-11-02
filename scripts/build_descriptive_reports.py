@@ -51,7 +51,9 @@ def md_table(df):
     def fmt(v, column):
         if pd.isna(v):
             return "—"
-        if "year" in str(column).lower() and isinstance(v, (int, float, np.integer, np.floating)) and float(v).is_integer():
+        column_name = str(column).strip().lower()
+        calendar_year = column_name in {"year", "account year", "năm"} or column_name.endswith("_year") or column_name.startswith("năm ")
+        if calendar_year and isinstance(v, (int, float, np.integer, np.floating)) and float(v).is_integer():
             return str(int(v))
         if isinstance(v, (float, np.floating)):
             return f"{v:,.4f}".rstrip("0").rstrip(".")
@@ -191,6 +193,7 @@ class Report:
             "diagnostics_script_sha256": hashlib.sha256((self.root / "scripts/eda_diagnostics.py").read_bytes()).hexdigest(),
             **({"airbnb_deep_dive_script_sha256": hashlib.sha256((self.root / "scripts/airbnb_deep_dive.py").read_bytes()).hexdigest()} if self.dataset == "AIRBNB" else {}),
             **({"presentation_script_sha256": hashlib.sha256((self.root / "scripts/airbnb_report_presentation.py").read_bytes()).hexdigest(),
+                "research_script_sha256": hashlib.sha256((self.root / "scripts/airbnb_research_revision.py").read_bytes()).hexdigest(),
                 "completed_stages": getattr(self, "completed_stages", []),
                 "executive_evidence": getattr(self, "executive_evidence", []),
                 "executive_numeric_checks": getattr(self, "executive_numeric_checks", []),
@@ -856,7 +859,7 @@ PROJECT_ROOT = next((p for p in (cwd, *cwd.parents)
 if PROJECT_ROOT is None:
     raise FileNotFoundError('Notebook cần package scripts/ của dự án; xem cấu trúc thư mục trong ô mở đầu.')
 required = [PROJECT_ROOT / 'scripts' / name for name in
-            ['__init__.py', 'build_descriptive_reports.py', 'eda_diagnostics.py', 'airbnb_deep_dive.py', 'airbnb_report_presentation.py']]
+            ['__init__.py', 'build_descriptive_reports.py', 'eda_diagnostics.py', 'airbnb_deep_dive.py', 'airbnb_report_presentation.py', 'airbnb_research_revision.py']]
 required += [PROJECT_ROOT / 'data' / 'raw' / 'AIRBNB' / name for name in
              ['train_users_2.csv', 'test_users.csv', 'sessions.csv', 'countries.csv', 'age_gender_bkts.csv']]
 missing = [str(p.relative_to(PROJECT_ROOT)) for p in required if not p.is_file()]
@@ -905,10 +908,12 @@ Ba bộ dữ liệu phù hợp với ba hành vi và ba đơn vị dự đoán k
 | Bộ | Hành vi phù hợp | Đơn vị | Giới hạn quyết định |
 | --- | --- | --- | --- |
 | HOTEL | Hủy/no-show của booking | Booking | Không đồng nghĩa customer churn; cần xác minh snapshot tại thời điểm dự đoán |
-| AIRBNB | Có booking đầu được ghi nhận; hoặc điểm đến đầu | Người dùng mới | Chưa có nhãn horizon 30/60/90 ngày chuẩn hóa; sessions thiếu timestamp và lệch độ phủ |
+| AIRBNB | Lượt đặt chỗ đầu tiên trong 90 ngày, dưới giả định theo dõi đủ 365 ngày | Người dùng mới | Nhãn y90 có điều kiện; cần xác nhận cơ chế theo dõi và hồ sơ tại t0; sessions thiếu timestamp |
 | EXPEDIA | Click/booking trong danh sách khách sạn | Cặp search-property | Phù hợp bối cảnh tìm kiếm/xếp hạng; không có ID khách để chấm CRM; thiếu search không click trong train |
 
 Nếu đề tài nhắm đến chuyển đổi khách hàng mới, AIRBNB phù hợp về đơn vị quan sát. Nếu nghiên cứu vận hành hủy booking, HOTEL rõ mục tiêu và nhẹ hơn. Nếu nghiên cứu tương tác với danh sách tìm kiếm, EXPEDIA phù hợp hơn. Không xếp một bộ là tốt nhất cho mọi mục tiêu và không coi mọi cột thô là feature hợp lệ.
+
+Đối với AIRBNB, nhãn y90 có {a.get('conditional_90_positive', 74027):,} trường hợp dương trên toàn bộ {a['rows']:,} dòng ({a.get('conditional_90_fraction_all_rows_pct', 34.6810):.2f}%). Khi để 29 ngoại lệ ngày âm ở trạng thái chưa gán, mẫu nghiên cứu còn {a.get('conditional_90_eligible', 213422):,} người, tỷ lệ dương {a.get('conditional_90_rate_pct', 34.6857):.2f}%. Đây là mục tiêu nghiên cứu dưới giả định mỗi người được theo dõi đủ 365 ngày. Thiết kế dùng khoảng đệm 90 ngày lịch và so sánh CatBoost với Logistic Regression mạnh. Các tỷ lệ theo nhãn y gốc trong phần so sánh ba bộ vẫn được giữ riêng.
 
 ## 2. Quy mô đã đối chiếu trực tiếp
 

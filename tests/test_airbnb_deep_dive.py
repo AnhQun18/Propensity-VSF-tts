@@ -9,9 +9,41 @@ from scripts.airbnb_deep_dive import (
     session_action_counts, session_audit,
 )
 from scripts.airbnb_report_presentation import normalize_text
+from scripts.airbnb_research_revision import conditional_labels, protocol_90
+from scripts.build_descriptive_reports import md_table
 
 
 class AirbnbDiagnosticTests(unittest.TestCase):
+    def test_90day_labels_keep_boundary_and_unknown_followup_distinct(self):
+        account = pd.Series(pd.to_datetime(["2014-01-01"]*6))
+        train = pd.DataFrame({"country_destination": ["US"]*5+["NDF"],
+                              "date_first_booking": ["2013-12-31", "2014-01-01", "2014-04-01", "2014-04-02", None, None]})
+        conditional, _ = conditional_labels(train, account)
+        observed, _ = conditional_labels(train, account, assume_365=False)
+        self.assertTrue(pd.isna(conditional.iloc[0]))
+        self.assertEqual(list(conditional.iloc[1:4]), [1,1,0])
+        self.assertTrue(pd.isna(conditional.iloc[4]))
+        self.assertEqual(conditional.iloc[5], 0)
+        self.assertTrue(pd.isna(observed.iloc[5]))
+
+    def test_embargo_covers_learning_and_calibration_label_availability(self):
+        account = pd.Series(pd.to_datetime(["2013-10-02", "2013-10-03", "2014-01-30", "2014-01-31", "2014-05-01"]))
+        train = pd.DataFrame(index=account.index)
+        table = protocol_90(train, account, pd.Series([0]*5, dtype="Int64"))
+        training = table[table.role.eq("học")]
+        self.assertTrue((pd.to_datetime(training.account_to)+pd.Timedelta(days=90) < pd.to_datetime(training.prediction_origin)).all())
+        calibration = table[table.role.eq("hiệu chỉnh")].iloc[0]
+        self.assertEqual(calibration.users, 1, "Jan 31 must stay in the calendar gap")
+        self.assertEqual(calibration.labels_ready_on, "2014-05-01")
+        self.assertEqual(calibration.embargo_days, 90)
+        self.assertTrue(table.loc[table.role.isin(["học","hiệu chỉnh"]), "embargo_days"].eq(90).all())
+
+    def test_calendar_years_are_not_formatted_as_grouped_counts(self):
+        rendered = md_table(pd.DataFrame({"Năm đăng ký": [2010,2013], "Số người dùng": [213451,76466], "Cỡ mẫu · năm 2014": [76466,76466]}))
+        self.assertIn("| 2010 | 213,451 | 76,466 |", rendered)
+        self.assertNotIn("2,010", rendered)
+        self.assertIn("| 2010 |", md_table(pd.DataFrame({"account year": [2010]})))
+
     def test_number_formatting_preserves_intervals_and_grouped_counts(self):
         text = "Xác suất [0,1]; tuổi [16,100]; hệ số [−1,1]; tỷ lệ 41,65%; V=0,207; n=213,451"
         self.assertEqual(normalize_text(text), "Xác suất [0; 1]; tuổi [16; 100]; hệ số [−1; 1]; tỷ lệ 41.65%; V=0.207; n=213,451")

@@ -26,10 +26,12 @@ NAMES = {
     "action": "Hành động", "action_type": "Loại hành động", "action_detail": "Chi tiết hành động",
     "countries": "Bảng quốc gia", "age_gender_bkts": "Bảng tổng hợp tuổi và giới tính",
     "sessions": "Nhật ký hoạt động", "user_id": "Định danh trong nhật ký",
+    "age_missing": "Thiếu tuổi", "gender_unknown": "Không rõ giới tính",
 }
 
 DISPLAY_HEADERS = {
     **NAMES, "item": "Nội dung", "description": "Mô tả", "dataset": "Bộ dữ liệu",
+    "account year": "Năm đăng ký", "year": "Năm",
     "unit": "Đơn vị", "evidence": "Bằng chứng", "fit": "Mức phù hợp", "decision": "Quyết định",
     "check": "Nội dung kiểm tra", "n": "Số người dùng", "positive": "Số có nhãn y=1",
     "rate_pct": "Tỷ lệ đặt chỗ (%)", "ci95_low_pct": "Cận dưới 95% (%)", "ci95_high_pct": "Cận trên 95% (%)",
@@ -55,7 +57,12 @@ DISPLAY_HEADERS = {
     "pct_all_observed_bookings": "Trong số người đã đặt chỗ (%)",
     "users": "Số người dùng", "users_with_sessions": "Số có nhật ký", "coverage_pct": "Độ phủ (%)",
     "proposed_use": "Mục đích đề xuất", "account_from": "Đăng ký từ ngày", "account_to": "Đăng ký đến ngày",
-    "observed_bookings": "Số có nhãn y=1", "booking_pct": "Tỷ lệ đặt chỗ (%)",
+    "observed_bookings": "Số có nhãn y90=1", "booking_pct": "Tỷ lệ y90=1 (%)",
+    "eligible_90": "Mẫu hợp lệ y90", "prediction_origin": "Mốc dự đoán",
+    "labels_ready_on": "Ngày nhãn cửa sổ sẵn có", "embargo_days": "Đệm (ngày lịch)",
+    "gap_start": "Đệm từ ngày", "gap_end": "Đệm đến ngày",
+    "source_rate": "Tỷ lệ nhãn y=1 (%)", "n90": "Mẫu hợp lệ y90", "positive90": "Số có nhãn y90=1",
+    "rate90": "Tỷ lệ nhãn y90=1 (%)", "lower90": "Cận dưới 95% · y90 (%)", "upper90": "Cận trên 95% · y90 (%)",
     "component": "Thành phần", "value": "Giá trị", "issue": "Vấn đề", "evidence_or_limit": "Bằng chứng và giới hạn",
 }
 
@@ -383,19 +390,19 @@ def executive_sources(report, by_key):
     by_key["quality_main"]["blocks"][0]["tables"].append(("B8 · Mức khớp giữa tình trạng ngày đặt chỗ và nhãn y", leakage))
     rows = [
         ["Phát hiện 1", "B1", "Quy mô train, test, số và tỷ lệ nhãn y=1", "facts.rows; facts.test_rows; facts.positive; facts.rate"],
-        ["Phát hiện 2", "B2; B6", "88,879 độ trễ hợp lệ; thời hạn và mức bao phủ 30/60/90 ngày", "facts.valid_booking_lags; facts.booking_coverage_30/60/90_pct"],
-        ["Phát hiện 3", "B3", "V của giới tính và ứng dụng đăng ký, toàn kỳ và năm 2014", "association: gender/signup_app × effect_all/effect_2014"],
-        ["Phát hiện 4", "B4", "Tỷ lệ thiếu tuổi, V cờ thiếu tuổi và rank-biserial tuổi 16–100", "missing tuổi từ train; association: hai dòng tuổi × effect_2014"],
+        ["Phát hiện 2", "B9", "Số dương trong 90 ngày, tỷ lệ trên toàn bộ dòng và mẫu hợp lệ sau khi bỏ ngoại lệ", "facts.conditional_90_positive; facts.conditional_90_eligible; facts.conditional_90_rate_pct"],
+        ["Phát hiện 3", "B10", "Tỷ lệ đặt chỗ theo giới tính, tình trạng tuổi và V giữa hai cờ thiếu", "profile_summary: nhãn y và V giữa chỉ báo đầu vào trong năm 2014"],
+        ["Phát hiện 4", "B11", "Chênh lệch ứng dụng trong nhóm có tuổi và có khai báo giới tính", "profile_apps: age_missing=False; gender_unknown=False; source_rate"],
         ["Phát hiện 5", "B5", "Độ phủ, chênh độ phủ, tỷ lệ đặt chỗ có/thiếu nhật ký; quy mô train 2014", "facts.train_2014_users; facts.train_2014_session_coverage_pct; sessions_2014"],
-        ["Việc cần giải quyết 1", "B6; B2; Q3", "29 ngoại lệ, độ trễ lớn nhất 365 ngày và phương án 90 ngày", "facts.negative_booking_lags; facts.max_observed_booking_lag_days; facts.proposed_deployment_horizon_days"],
+        ["Việc cần giải quyết 1", "B9; Q3", "Nghiên cứu y90 với giả định theo dõi 365 ngày, ngoại lệ và độ nhạy NDF", "Quy tắc conditional_labels và bảng nhạy cảm với giả định"],
         ["Việc cần giải quyết 2", "B8; Q1", "Mức khớp 100% và điều kiện thông tin tại t0", "Tính trực tiếp từ ngày đặt chỗ có giá trị và nhãn y"],
-        ["Việc cần giải quyết 3", "B7", "Hiệu chỉnh tháng 4/2014 và đánh giá tháng 5–6/2014", "protocol: account_from/account_to; đây là đề xuất, chưa chia tập"],
+        ["Việc cần giải quyết 3", "B7", "Huấn luyện đến 2013-10-02; hiệu chỉnh 2014-01-01 đến 2014-01-30; đệm 90 ngày; đánh giá tháng 5–6/2014", "protocol: cửa sổ, mốc dự đoán, ngày nhãn sẵn có và đệm theo ngày lịch"],
     ]
     provenance = pd.DataFrame(rows, columns=["Ý trong tóm tắt", "Bảng hoặc câu hỏi nguồn", "Số liệu và nội dung được đối chiếu", "Đường dẫn dữ liệu hoặc cách tính"])
-    by_key["appendix"]["blocks"].append(section("executive_sources", "Truy vết số liệu trong tóm tắt", "Mã B1–B8 đứng trước tên các bảng tương ứng. Các số được làm tròn khi trình bày. Metadata giữ giá trị đầy đủ trong facts và dấu kiểm tra của các bảng thống kê. Các mốc chia thời gian là đề xuất nghiên cứu, không phải kết quả đã thực hiện.", [("Nguồn của từng phát hiện và việc cần giải quyết", provenance)]))
+    by_key["appendix"]["blocks"].append(section("executive_sources", "Truy vết số liệu trong tóm tắt", "Mã B1–B11 đứng trước tên các bảng tương ứng. Các số được làm tròn khi trình bày. Metadata giữ giá trị đầy đủ trong facts và dấu kiểm tra của các bảng thống kê. Các mốc chia thời gian là đề xuất nghiên cứu, không phải kết quả đã thực hiện.", [("Nguồn của từng phát hiện và việc cần giải quyết", provenance)]))
     text = by_key["executive"]["text"]
-    sources = ["B1", "B2 và B6", "B3", "B4", "B5"]
-    next_sources = ["B6, B2 và Q3", "B8 và Q1", "B7"]
+    sources = ["B1", "B9", "B10", "B11", "B5"]
+    next_sources = ["B9 và Q3", "B8 và Q1", "B7"]
     current = None
     parts = []
     for paragraph in text.split("\n\n"):
@@ -416,8 +423,9 @@ def executive_sources(report, by_key):
         return {str(Decimal(token.replace(",", "")).normalize())
                 for token in re.findall(pattern, str(text))}
     tables = {"B1": size, "B2": evidence["horizons"], "B3": by_key["signal"]["tables"][0][1],
-              "B4": missing, "B5": coverage, "B6": evidence["delay"], "B7": evidence["protocol"], "B8": leakage}
-    citations = [["B1"], ["B2", "B6"], ["B3"], ["B4"], ["B5"], ["B6", "B2"], ["B8"], ["B7"]]
+              "B4": missing, "B5": coverage, "B6": evidence["delay"], "B7": evidence["protocol"], "B8": leakage,
+              **report.research_tables}
+    citations = [["B1"], ["B9"], ["B10"], ["B11"], ["B5"], ["B9"], ["B8"], ["B7"]]
     paragraphs = [p for p in parts if re.match(r"^\d\. \*\*", p)]
     checks = []
     for paragraph, references in zip(paragraphs, citations):
@@ -442,14 +450,12 @@ def executive_sources(report, by_key):
 def apply_stage_four(report):
     from scripts.eda_diagnostics import section
     by_key = {item["key"]: item for item in walk_sections(report.sections)}
-    path = timeline_figure(report)
+    from scripts.airbnb_research_revision import timeline_with_embargo, research_roles
+    path = timeline_with_embargo(report)
     by_key["evaluation"]["figures"] = [path]
     report.figure_notes[path.name] = (
-        "**Quan sát:** tập học mở rộng qua ba lượt kiểm định. Cấu hình được chọn trước khi huấn luyện lại đến hết tháng 3/2014. "
-        "Tháng 4 dành cho hiệu chỉnh và tháng 5–6 dành cho đánh giá cuối.\n\n"
-        "**Phạm vi và cách đọc:** các thanh biểu diễn khoảng ngày tạo tài khoản, không phải khoảng nhãn đã hoàn tất. "
-        "Cỡ mẫu là số người quan sát trong cửa sổ, chưa phải số đủ điều kiện huấn luyện sau khi kiểm tra thời điểm có nhãn. "
-        "Với mục tiêu 90 ngày, cần bổ sung điều kiện theo dõi đủ 90 ngày trước mỗi mốc dự đoán."
+        "**Quan sát:** mỗi tập học cách tập kiểm định hoặc hiệu chỉnh một khoảng đệm 90 ngày. Hiệu chỉnh dùng người đăng ký 2014-01-01 đến 2014-01-30, rồi chờ đến 2014-05-01 mới bắt đầu đánh giá cuối.\n\n"
+        "**Phạm vi và cách đọc:** thanh màu là cửa sổ ngày đăng ký; vùng gạch là khoảng đệm không đưa vào tập trước. Cỡ mẫu loại ngoại lệ chưa gán y90. Ngày nhãn sẵn có dùng quy tắc ngày đăng ký cuối + 91, tương đương ngày thứ 90 hoàn tất trước mốc dự đoán. Toàn bộ nhãn y90 vẫn có điều kiện trên giả định theo dõi đủ 365 ngày."
     )
     roles = pd.DataFrame([
         ["Huấn luyện và chọn cấu hình", "Các cửa sổ học/kiểm định liên tiếp", "Học xử lý dữ liệu trong từng tập học; chọn tham số, số vòng và phương pháp hiệu chỉnh bằng dữ liệu phát triển", "Không dùng nhãn xuất hiện sau mốc dự đoán; tập kiểm định không học thống kê tiền xử lý"],
@@ -458,7 +464,7 @@ def apply_stage_four(report):
         ["Đánh giá cuối", "Tháng 5–6/2014", "Tính log loss, Brier, AP, ROC-AUC, lift và độ ổn định theo tháng", "Dùng sau khi chốt mô hình và bộ hiệu chỉnh; nếu sửa thiết kế phải công bố đánh giá đã bị sử dụng"],
         ["Đối chiếu test Kaggle", "Tháng 7–9/2014", "Kiểm tra cấu trúc cột, nhóm giá trị mới và thay đổi phân phối", "Không tính chất lượng dự báo vì không có nhãn"],
     ], columns=["Giai đoạn", "Phạm vi", "Được thực hiện", "Điều kiện tách biệt"])
-    by_key["evaluation"]["tables"].append(("Vai trò từng giai đoạn huấn luyện, hiệu chỉnh và đánh giá", roles))
+    by_key["evaluation"]["tables"].append(("Vai trò từng giai đoạn huấn luyện, hiệu chỉnh và đánh giá", research_roles()))
     executive_sources(report, by_key)
     criteria = pd.DataFrame([
         ["0 · Sửa nội dung", "Đủ cảnh báo mẫu số và t0; số thập phân thống nhất; không lặp từ; mở đầu không có lệnh cài; ngày tải ghi đúng bằng chứng", "Kiểm tra văn bản, notebook và metadata"],
@@ -504,6 +510,8 @@ def prepare_publication(report):
     if STAGE >= 3:
         apply_stage_three(report)
     if STAGE >= 4:
+        from scripts.airbnb_research_revision import apply_research_revision
+        apply_research_revision(report)
         apply_stage_four(report)
     for item in walk_sections(report.sections):
         item["title"] = normalize_text(item["title"])
@@ -522,7 +530,7 @@ def prepare_publication(report):
         hashlib.sha256(md_table(table).encode()).hexdigest()
         for item in walk_sections(report.sections) for _, table in item["tables"])
     report.facts["completion_stage"] = STAGE
-    report.facts["analysis_revision"] = "airbnb_completion_stages_0_to_4"
+    report.facts["analysis_revision"] = report.facts.get("research_revision", "airbnb_completion_stages_0_to_4")
     previous = report.directory / "analysis_metadata.json"
     if previous.exists():
         previous_meta = json.loads(previous.read_text(encoding="utf-8"))
@@ -533,7 +541,9 @@ def prepare_publication(report):
                 if value != report.facts[key]:
                     raise ValueError(f"Statistical fact changed: {key}")
         if "statistical_fingerprint" in old:
-            assert old["statistical_fingerprint"] == report.facts["statistical_fingerprint"], "Evidence changed"
+            if old["statistical_fingerprint"] != report.facts["statistical_fingerprint"]:
+                assert old["analysis_revision"] == "airbnb_completion_stages_0_to_4", "Evidence changed within revision"
+                assert old["statistical_fingerprint"] == report.facts["base_evidence_fingerprint"], "Underlying source evidence changed"
     for item in walk_sections(report.sections):
         for path in item["figures"]:
             assert path.name in report.figure_notes, f"Missing caption: {path.name}"
@@ -575,9 +585,11 @@ def verify_artifacts(root, notebook):
                           ("airbnb_deep_dive_script_sha256", "airbnb_deep_dive.py"),
                           ("presentation_script_sha256", "airbnb_report_presentation.py")]:
         assert meta[key] == hashlib.sha256((root / "scripts" / filename).read_bytes()).hexdigest()
+    assert meta["research_script_sha256"] == hashlib.sha256((root / "scripts/airbnb_research_revision.py").read_bytes()).hexdigest()
     history = meta.get("completed_stages", [])
     history = [row for row in history if row["stage"] != STAGE]
     history.append({"stage": STAGE, "executed_cells": len(cells),
+                    "revision": meta["facts"]["analysis_revision"],
                     "statistical_fingerprint": meta["facts"]["statistical_fingerprint"],
                     "checks": "numeric facts, evidence, captions, notebook outputs, source hashes, decimals" + (", executive number provenance, column decisions, merged limitations, timeline" if STAGE >= 4 else "")})
     meta["completed_stages"] = sorted(history, key=lambda row: row["stage"])
