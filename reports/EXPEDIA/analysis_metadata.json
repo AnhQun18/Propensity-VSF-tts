@@ -93,12 +93,127 @@
     ],
     "figure_seed": 42,
     "download_date": null,
-    "rules_checked_on": "2026-11-01"
+    "rules_checked_on": "2026-11-01",
+    "columns_association_audited": 10,
+    "searches_mixed_random_bool": 0,
+    "macro_search_click_pct": 5.816994240445303,
+    "macro_search_booking_pct": 3.626364108636907,
+    "protocol_kind": "search_time_conditional_label_maturity",
+    "columns_with_usage_decision": 54,
+    "research_revision": "hotel_expedia_airbnb_structure_v1",
+    "research_evidence_sha256": "4f9b31f9cd7f6beb95cf128164562605500bb0386c7e12e33fae7e649249bed6"
   },
-  "analysis_date": "2026-11-01",
-  "script_sha256": "31eec886e8715e1d24423d34227d9f4ebfa31723cdf2c4b0dddcd6e74d1e244b",
-  "diagnostics_script_sha256": "25d76cae62b2932b9aa90733451f89e9702c29e9a8bb6a652c1a4f8dc7b4f295",
+  "analysis_date": "2026-11-02",
+  "script_sha256": "1ef214b0ac53762f579007756793286c9e22dcab070d3d048e04cafab0b74296",
+  "diagnostics_script_sha256": "9e370009529921096180542336db80e9ba3c869d48ef9dce089cfba522e6c521",
   "full_train_script_sha256": "994a5145acaecd47ec450d0d808605762e91c7ffce1b1cc5d2a80ee7eb3964e3",
+  "research_script_sha256": "01c5377e5dc04287d984268a673a3db00562c544aadcaec0b724cdf421ba8d00",
+  "rendered_tables_sha256": [
+    "030cfda213e920fae1bf298c314678104856d07ca8a08f2bb797f87eb9b5d4e6",
+    "035686f8781dfe1eb609aba768e4134ccc6843da7ae5f931db983bda43d1e6ee",
+    "035686f8781dfe1eb609aba768e4134ccc6843da7ae5f931db983bda43d1e6ee",
+    "1661b01309e146e45b40a41145b059d0b651f6c25c5aa10e75ee72c7a4e6b417",
+    "17027f46f911d1eec21d94cf9b70f9247b231235c1f6780aca52960cfbf16aad",
+    "23212eed7e0e33d89eafa51f9d755375c3cb0eb2cfe57434684c8dd7d3484c50",
+    "248d050c90d96cf12209b3e07cd3643bfcddc440b74e57ea1d9adec447627301",
+    "264f32aff5c90125d55f9cc82a700b1bc0abf5e38f8fe4875c335e671b1aeaec",
+    "2c0f8e1a093e0d56de6feeed1350c330350298f80d76701563508853eead9e1c",
+    "2d1772f129eacda89e491ba563b04924dfa5732db350b4a14224b97165df7257",
+    "314806f0c92486434b261d733072e64dd5797130ed75ee097bc60b29aaf24fb0",
+    "314806f0c92486434b261d733072e64dd5797130ed75ee097bc60b29aaf24fb0",
+    "347fce47ce0f425f7fa2415426ddcb3e9f1207c40efd926979556108b22a4a68",
+    "370ea03fd6ef6a264d42f136f05f8f72a21ba56df19e883c02611d503258364f",
+    "3e87a27b80fd4ced59e71599076c5f9052e82b8f4cdd91497ff415a33122d8fe",
+    "41308c388f26a95d3cdb0dc570fddccd93ec173f35b61637f8319bd1689a9409",
+    "444cdae6be8dc8444bde1800e3465ecdb8a5d048f395d9ca2e451aa45fbae2b6",
+    "45edcfd51f9a080cceac711cd771f19fe02498bc5884c6aae261cf335fde072c",
+    "4adaf7b98187cc24f8daabea7a79909dd97894ce2fd3ccd19dee04e5720f16e2",
+    "4d2e1ac9f2d6d6be55f36cf6690b3fc89b22b5e7129284a710c3b71bb423492c",
+    "4def55d5bd0ec5107a3e9e3fae93c621869924d9a8f679c6f2acc3eb04ae6289",
+    "4fce1b43318fca708f2ba9b4732901ef13b4d14009867e0eccf8c78e6ae27c32",
+    "506455228f614967e3362a59bc4b4de932a90d4625e49908118006edaab6c1c1",
+    "56d229d5204362d73a3f3d8a1f5434ec87aa97dfe7d58ef7150cef6a3a4f14b3",
+    "56d229d5204362d73a3f3d8a1f5434ec87aa97dfe7d58ef7150cef6a3a4f14b3",
+    "578728155e22e7bff6ae95080a3533bfee22d32a6dfde7c4c780d3d52e71d5f6",
+    "58962d9c2e457b752a660885757b36c94f8f65119124a794c6a43827a59dbc21",
+    "69e8d6f506ffb35a82967dd49f555607a6568d4adc5999ae5b42880f8eea364f",
+    "72a61a172e144fc1f5b857bccc4de06a991018c13225279776aa545f019e2fe2",
+    "7439af2e9685153a5d57e6a6f2277e9e0a4f0551544add2dd452bbd8a68ba014",
+    "81556df3d9c494297a5cce8baffa26be012a6b94eea9ee04be60ad7cba686e2d",
+    "81556df3d9c494297a5cce8baffa26be012a6b94eea9ee04be60ad7cba686e2d",
+    "82c1241cc7c326c6f77ac3c1a6d982609247a6d1d367dcbdae1b8e1a38f112f5",
+    "8fb89649e8134584ff8b857aeb3f7c444803654008cac7c0f7800d45461591a1",
+    "90eb40ba2b3d5dcfbb905d3f945d3325765bbadc4f85c3555f041bfd986b73b4",
+    "9368efe2e82e326877b6879ca745ab22627b9680c1742cc10994c7b1bca66933",
+    "9499ec08a15b93276e5ac6fc1fa41195281cf541e3f8f592538acc9e182151b7",
+    "9a8fdb7e6f55912a48008d5f6c3c6ee1d2edaf1c0fad9662c3f64dad854f3fd6",
+    "9a8fdb7e6f55912a48008d5f6c3c6ee1d2edaf1c0fad9662c3f64dad854f3fd6",
+    "9f2eaea5982561677fe89e89e69ec4547bb9544b60e00c01e610adae4fdc75e5",
+    "a56e91334dafe7f66f500f89b5eeeb47d27933f7af0115bae9389cc1a4f18fba",
+    "aa472db008fffe51822bd8cd7b5fff3e4b0bb15d14f689bab5be28a74f1fe2b8",
+    "b3306fc5f972749f2ddaea2040ed5ffb75d24b91c4b8dd33adb5a7fd80be3733",
+    "ba705a56bd60618ea68b76bc67b839a0f492b369827a847f01e85a3658cf7564",
+    "babb0dd19b80a9e7fda9bc03e4ff9f116265530ffe1ea80ee2ec88a110d91a37",
+    "bd815321cfa426a1fca412dd160ae14f7b856c43cb48537c0a8d4c326ae2d5dd",
+    "bfd05e5b6af3c0354c806e26673913e95bf9aa3027d8b3c88ee45cec354dc686",
+    "c3e902bfe896216d3fd0fcb2f7473c319baf695435d6b71f6cde5fca147ecd80",
+    "c692636e6d86e1357f4c2dfbf9eb23d998c1021244908703369330a5cd8328d3",
+    "d1e070ce0d8b7b3636d4dc4373351e2cbcb544691d5580e15f3158d29a977981",
+    "d800e08ac0215c337056fd1fea53577da42fc4ac30c9808ffe49b2161c7d98f1",
+    "d85199732f8c4f99485d08afa52626a98056d4bc05a53896818d435e7aee001f",
+    "e649527644413935d2b02881bf850af4fd9d2759872b710d7956cae0dc9fcec6",
+    "ed36afc8747a3466f4d10c5a7ce6422a0ebe15eb7e790f9f97f74cc9abc2d25e",
+    "f2101487de9085dc30e43a99c2d8cdceefc2c2ecb9f7a15d5abf55422223a123",
+    "ffccd048236482a572e7df4c862fc06d5d0e5fbcc2c1ec7c2d8b642e669ce4e1"
+  ],
+  "executive_evidence": [
+    {
+      "finding": "**Đơn vị và quy mô:** 9,917,530 cặp thuộc 399,344 search; 54 cột train và 50 cột test. Không có user ID để chấm CRM.",
+      "section_key": "quality",
+      "values": {
+        "rows": 9917530,
+        "searches": 399344,
+        "columns": 54,
+        "test_columns": 50
+      }
+    },
+    {
+      "finding": "**Hai hành vi:** click 443,672 (4.47%), booking 276,593 (2.79%). Mẫu số là cặp search–property.",
+      "section_key": "quality",
+      "values": {
+        "clicks": 443672,
+        "bookings": 276593,
+        "click_rate": 0.044736138937820205,
+        "booking_rate": 0.027889303082521556
+      }
+    },
+    {
+      "finding": "**Quần thể có điều kiện:** 0 search hoàn toàn không click trong train; không suy CTR/CVR toàn website từ mẫu này.",
+      "section_key": "quality",
+      "values": {
+        "searches_without_click": 0
+      }
+    },
+    {
+      "finding": "**Phụ thuộc trong search:** 0 search có cờ random không đồng nhất; đã tách trọng số theo dòng/search và phân tầng giá, sao theo cơ chế.",
+      "section_key": "search_context",
+      "values": {
+        "mixed_random": 0
+      }
+    },
+    {
+      "finding": "**Đầu vào và rò rỉ:** đủ 54 cột raw có quyết định; position, gross và hai nhãn bị chặn khỏi đầu vào trước hiển thị; srch_id chỉ làm khóa.",
+      "section_key": "column_decisions",
+      "values": {
+        "decisions": 54
+      }
+    },
+    {
+      "finding": "**Thiết kế đề xuất:** LR có tương tác so với LightGBM binary cho xác suất; LambdaRank là nhánh riêng. Giữ nguyên search qua các tập; khoảng đệm nhãn cần xác nhận, bootstrap theo search.",
+      "section_key": "design",
+      "values": {}
+    }
+  ],
   "environment": {
     "Python": "3.14.2",
     "pandas": "2.3.3",
@@ -108,13 +223,15 @@
     "Chunk CSV lớn": "250000"
   },
   "section_keys": [
+    "glossary",
     "executive",
+    "problem",
     "overview",
     "quality_main",
     "univariate",
     "multivariate_main",
     "risks",
-    "conclusion_main",
+    "design",
     "appendix",
     "reproducibility"
   ],
@@ -122,12 +239,15 @@
   "download_date_note": "Chưa được ghi nhận; không suy từ mtime/ctime.",
   "figure_seed": 42,
   "figure_notes": {
-    "missing_patterns.png": "Nhận xét: comp1_rate_percent_diff thiếu 98.14% trên toàn bộ train; chênh lệch missing lớn nhất giữa hai nhãn là 99.9996 điểm phần trăm ở gross_bookings_usd. Bảng tỷ lệ, số đếm và tương quan cờ thiếu dùng đủ 9,917,530 dòng. Chỉ hình pattern bên trái hiển thị 300 dòng, seed=42, sắp theo pattern, không theo thời gian. Ô xanh là NA. Không suy cơ chế MCAR/MAR/MNAR từ hình; cờ thiếu gross booking vẫn tiết lộ kết quả.",
-    "outliers_and_target.png": "Nhận xét: theo hàng rào Q1−1,5×IQR và Q3+1,5×IQR, price_usd có 586,503/9,917,530 giá trị bị gắn cờ (5.91%) trong toàn bộ train; đây là bất thường thống kê, chưa phải lỗi nhập liệu. Median srch_booking_window theo nhãn: 0=17.00, 1=13.00. Boxplot bên phải ẩn các điểm ngoài whisker để đọc vùng giữa, không xóa chúng khỏi bảng hay raw. Đơn vị xem từ điển; IQR=0 ở biến rời rạc có thể gắn cờ nhiều giá trị thật. Trục x boxplot raw dùng symlog; hàng rào IQR vẫn tính trên giá trị raw, không phải log.",
-    "multivariate.png": "Nhận xét: Spearman giá–hạng sao trên toàn bộ cặp hợp lệ của train là 0.552; cặp có |rho| lớn nhất trong ma trận là price_usd–prop_log_historical_price (rho=0.570, n=9,917,530). Ma trận tính lại thứ hạng trên các dòng không thiếu của từng cặp; số dòng từng cặp ở phụ lục. Scatter chỉ hiển thị tối đa 4.000 điểm, seed=42, trục y symlog để đọc đuôi dài. Không biến đổi raw, không chọn feature hoặc kết luận nhân quả/đa cộng tuyến từ tương quan.",
-    "categories_and_target.png": "Nhận xét: trong toàn bộ train, nhóm prop_starrating=4 có booking rate cao nhất trong bảng (3.34%, n=3,045,848); các nhóm có quy mô khác nhau. Mã 0 cần xác minh nghĩa, không mặc định là chất lượng bằng 0; chênh lệch không được điều chỉnh theo giá/vị trí.",
-    "distributions.png": "Nhận xét: trên toàn bộ train, giá có mean 241.78 USD, median 122.07 USD và max 19726328.00 USD, cho thấy đuôi phải lớn. Histogram đếm tất cả giá trong 0–1.000 USD; 27,018 dòng trên 1.000 USD vẫn nằm trong thống kê/boxplot. Phân phối số ứng viên dùng đủ 399,344 searches.",
-    "position.png": "Nhận xét: tại vị trí nhỏ nhất quan sát được, random_bool=0: click 21.55%, booking 19.49%, n=277,662; random_bool=1: click 14.20%, booking 1.84%, n=120,907. Chênh lệch giữa các cơ chế xếp hạng và sự phụ thuộc theo vị trí cho thấy CTR không chỉ phản ánh sở thích; đây chưa phải ước lượng nhân quả của thứ hạng.",
-    "calendar.png": "Nhận xét: tỷ lệ click theo tháng dao động 4.37–4.56%, booking 2.63–2.86% trong train. Khoảng thời gian chưa đủ nhiều chu kỳ năm để khẳng định mùa vụ bền vững; quy mô dòng còn phụ thuộc số property/search."
+    "missing_patterns.png": "**Quan sát:** comp1_rate_percent_diff thiếu 98.14% trên toàn bộ train; chênh lệch missing lớn nhất giữa hai nhãn là 99.9996 điểm phần trăm ở gross_bookings_usd. Bảng tỷ lệ, số đếm và tương quan cờ thiếu dùng đủ 9,917,530 dòng. Chỉ hình pattern bên trái hiển thị 300 dòng, seed=42, sắp theo pattern, không theo thời gian. Ô xanh là NA. Không suy cơ chế MCAR/MAR/MNAR từ hình; cờ thiếu gross booking vẫn tiết lộ kết quả.\n\n**Phạm vi và cách đọc:** Bảng tổng hợp dùng toàn bộ dữ liệu; hình pattern tối đa 300 dòng seed=42. Không xác định cơ chế MCAR/MAR/MNAR.",
+    "outliers_and_target.png": "**Quan sát:** theo hàng rào Q1−1,5×IQR và Q3+1,5×IQR, price_usd có 586,503/9,917,530 giá trị bị gắn cờ (5.91%) trong toàn bộ train; đây là bất thường thống kê, chưa phải lỗi nhập liệu. Median srch_booking_window theo nhãn: 0=17.00, 1=13.00. Boxplot bên phải ẩn các điểm ngoài whisker để đọc vùng giữa, không xóa chúng khỏi bảng hay raw. Đơn vị xem từ điển; IQR=0 ở biến rời rạc có thể gắn cờ nhiều giá trị thật. Trục x boxplot raw dùng symlog; hàng rào IQR vẫn tính trên giá trị raw, không phải log.\n\n**Phạm vi và cách đọc:** Quần thể, mẫu số và cửa sổ hiển thị ghi trên hình và bảng cạnh hình. Giữ nguyên giá trị raw; nhóm nhỏ cần đọc thận trọng.",
+    "multivariate.png": "**Quan sát:** Spearman giá–hạng sao trên toàn bộ cặp hợp lệ của train là 0.552; cặp có |rho| lớn nhất trong ma trận là price_usd–prop_log_historical_price (rho=0.570, n=9,917,530). Ma trận tính lại thứ hạng trên các dòng không thiếu của từng cặp; số dòng từng cặp ở phụ lục. Scatter chỉ hiển thị tối đa 4.000 điểm, seed=42, trục y symlog để đọc đuôi dài. Không biến đổi raw, không chọn feature hoặc kết luận nhân quả/đa cộng tuyến từ tương quan.\n\n**Phạm vi và cách đọc:** Tương quan dùng từng cặp không thiếu; scatter tối đa 4.000 điểm chỉ để hiển thị.",
+    "categories_and_target.png": "**Quan sát:** trong toàn bộ train, nhóm prop_starrating=4 có booking rate cao nhất trong bảng (3.34%, n=3,045,848); các nhóm có quy mô khác nhau. Mã 0 cần xác minh nghĩa, không mặc định là chất lượng bằng 0; chênh lệch không được điều chỉnh theo giá/vị trí.\n\n**Phạm vi và cách đọc:** Quần thể, mẫu số và cửa sổ hiển thị ghi trên hình và bảng cạnh hình. Giữ nguyên giá trị raw; nhóm nhỏ cần đọc thận trọng.",
+    "distributions.png": "**Quan sát:** trên toàn bộ train, giá có mean 241.78 USD, median 122.07 USD và max 19726328.00 USD, cho thấy đuôi phải lớn. Histogram đếm tất cả giá trong 0–1.000 USD; 27,018 dòng trên 1.000 USD vẫn nằm trong thống kê/boxplot. Phân phối số ứng viên dùng đủ 399,344 searches.\n\n**Phạm vi và cách đọc:** Quần thể, mẫu số và cửa sổ hiển thị ghi trên hình và bảng cạnh hình. Giữ nguyên giá trị raw; nhóm nhỏ cần đọc thận trọng.",
+    "position.png": "**Quan sát:** tại vị trí nhỏ nhất quan sát được, random_bool=0: click 21.55%, booking 19.49%, n=277,662; random_bool=1: click 14.20%, booking 1.84%, n=120,907. Chênh lệch giữa các cơ chế xếp hạng và sự phụ thuộc theo vị trí cho thấy CTR không chỉ phản ánh sở thích; đây chưa phải ước lượng nhân quả của thứ hạng.\n\n**Phạm vi và cách đọc:** Toàn bộ train, phân tầng random_bool. Vị trí là cơ chế tiếp xúc; không diễn giải thành tác động nhân quả.",
+    "calendar.png": "**Quan sát:** tỷ lệ click theo tháng dao động 4.37–4.56%, booking 2.63–2.86% trong train. Khoảng thời gian chưa đủ nhiều chu kỳ năm để khẳng định mùa vụ bền vững; quy mô dòng còn phụ thuộc số property/search.\n\n**Phạm vi và cách đọc:** Số lượng và tỷ lệ theo năm–tháng; tháng đầu/cuối có thể thiếu ngày. Không kết luận mùa vụ chỉ từ số tháng gộp.",
+    "association_strength.png": "**Quan sát:** mỗi biến có hai điểm cho liên hệ với click và booking, cho phép kiểm tra liệu tín hiệu hai hành vi có đồng nhất.\n\n**Phạm vi và cách đọc:** toàn bộ train; chỉ mười cách nhóm công bố, chưa phải toàn bộ 49 cột ứng viên. Cramér V không hiệu chỉnh số nhóm, không là điểm chất lượng mô hình hoặc quan hệ nhân quả. Không dùng p-value giả định 9.9 triệu dòng độc lập.",
+    "observation_structure.png": "**Quan sát:** nhiều khách sạn cùng thuộc một search; số dòng không là số search hoặc số người dùng.\n\n**Phạm vi và cách đọc:** sơ đồ cấu trúc dữ liệu raw hiện có, không biểu diễn quan hệ nhân quả.",
+    "evaluation_timeline.png": "**Quan sát:** các cửa sổ đánh giá dùng thứ tự thời gian và lịch sử mở rộng.\n\n**Phạm vi và cách đọc:** trục là timestamp search; vùng gạch chéo là khoảng đệm bảy ngày giả định. Chưa xác nhận độ trưởng thành nhãn; không fit nếu thiếu bằng chứng. Toàn bộ srch_id phải nằm trong một tập."
   }
 }

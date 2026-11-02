@@ -391,6 +391,8 @@ def enrich_hotel(report,df,arrival):
         "**Tính phù hợp:** dùng cho cancellation/no-show ở cấp booking, với điều kiện loại thông tin kết quả và xác minh snapshot tại t0; chưa đủ để gọi là customer churn. Ma trận rủi ro và đề xuất ở mục 5–6 nêu các điểm cần giải quyết.",
     ]
     restructure(report,additions,insights,f"Arrival {arrival.min().date()}–{arrival.max().date()}")
+    from scripts.hotel_expedia_research import deepen_hotel
+    deepen_hotel(report, df, arrival)
 
 
 def enrich_airbnb(report,train,test,ids,account,per_user,transaction_counts):

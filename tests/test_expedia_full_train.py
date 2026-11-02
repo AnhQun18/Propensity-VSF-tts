@@ -25,6 +25,7 @@ class ExpediaFullTrainTests(unittest.TestCase):
         frame["prop_starrating"] = [1, 1, 2, 2, 3, 4, 4, 2, 5, 3, 4, 5]
         frame["click_bool"] = [1, 0, 0, 0] * 3
         frame["booking_bool"] = [1, 0, 0, 0] + [0] * 8
+        frame["random_bool"] = [0] * 4 + [0, 0, 1, 1] + [1] * 4
         frame["gross_bookings_usd"] = [20] + [np.nan] * 11
         frame.loc[[1, 2, 5, 11], "comp1_rate"] = np.nan
         numeric = builder.EXPEDIA_NUM + [f"comp{i}_rate_percent_diff" for i in range(1, 9)] + ["gross_bookings_usd"]
@@ -37,6 +38,11 @@ class ExpediaFullTrainTests(unittest.TestCase):
                     result = builder.scan_expedia(path, True, store)
                 self.assertEqual(result["rows"], len(frame))
                 self.assertEqual(result["queries"].n.to_dict(), {10: 4, 20: 4, 30: 4})
+                self.assertEqual(result["queries"].random_min.to_dict(), {10: 0, 20: 0, 30: 1})
+                self.assertEqual(result["queries"].random_max.to_dict(), {10: 0, 20: 1, 30: 1})
+                for grouping in ["random_star", "random_price"]:
+                    self.assertEqual(result["groups"][grouping].n.sum(), len(frame))
+                    self.assertEqual(result["groups"][grouping].bookings.sum(), frame.booking_bool.sum())
                 self.assertEqual(result["duplicate_pairs"], 0)
                 table = result["stats"].set_index("column")
                 for column in numeric:

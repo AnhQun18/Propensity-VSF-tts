@@ -12,7 +12,9 @@ Ngày phân tích: 2026-11-02. Phạm vi là dữ liệu CSV hiện có trong d�
 6. **Đuôi giá và missing cần quy tắc rõ:** mỗi bộ đã có bảng hàng rào 1,5×IQR, tỷ lệ outlier, heatmap missing và ma trận tương quan. Expedia tính percentile, skewness, outlier, Spearman và missing theo nhãn trên toàn bộ train; chỉ scatter/pattern missing giới hạn số điểm hiển thị. Số liệu nằm cạnh hình ở từng báo cáo.
 7. **Khả năng sử dụng có điều kiện:** HOTEL cho hủy/no-show, AIRBNB cho booking đầu ở cấp user, EXPEDIA cho search/ranking. Tất cả còn câu hỏi về t0/phạm vi áp dụng; ngày tải raw chưa được ghi nhận, giấy phép/điều khoản được trình bày tại nguồn của từng bộ, không gán mặc định quyền sử dụng mở.
 
-Các báo cáo chi tiết cùng cấu trúc: tổng quan nguồn/phiên bản → chất lượng → đơn biến → đa biến/thời gian/nhóm con → rủi ro → kết luận và đề xuất; executive summary ở đầu, từ điển/bảng dài ở phụ lục. Mỗi hình có nhận xét định lượng ngay bên dưới. Đề xuất xử lý thiếu, mã hóa, feature engineering và mô hình chỉ là hướng cho giai đoạn sau, chưa thực hiện.
+Các báo cáo chi tiết cùng cấu trúc: thuật ngữ → tóm tắt điều hành → bài toán → nguồn/phiên bản → chất lượng → đơn biến → nhãn/đa biến/thời gian/nhóm con → giới hạn → thuật toán và thiết kế đánh giá. Từ điển, quyết định từng cột, bảng dài và truy vết tóm tắt nằm ở phụ lục. Các lịch chia tập và ngưỡng chấp nhận là đề xuất; chưa tạo tập học hoặc huấn luyện mô hình.
+
+HOTEL bổ sung liên hệ của 29 cột ứng viên, độ nhạy raw/bỏ trùng/từng khách sạn, chuẩn hóa cơ cấu phân khúc và quyết định vai trò cho đủ 32 cột. Thiết kế so sánh LR có tương tác với CatBoost; lịch theo tháng đến chỉ dùng chẩn đoán hồi cứu khi chưa có snapshot tại t0. EXPEDIA bổ sung liên hệ với hai nhãn, trọng số theo dòng/search, phân tầng giá/sao theo cơ chế hiển thị và quyết định vai trò đủ 54 cột. Thiết kế xác suất so sánh LR với LightGBM binary; LambdaRank là nhánh xếp hạng riêng. Khoảng đệm nhãn Expedia chưa được xác nhận; không coi lịch đề xuất là bằng chứng nhãn đã hoàn tất.
 
 ## 1. Kết luận phục vụ lựa chọn bài toán
 
@@ -81,7 +83,7 @@ Tỷ lệ theo booking, user và cặp search-property trả lời các câu h�
 - Train có 399,344 searches, **0 search không click**. Không suy rộng tỷ lệ trong tập thành tỷ lệ tương tác của toàn website; cần xác minh cơ chế chọn mẫu.
 - `gross_bookings_usd` là kết quả sau booking. `position` không có trong test; click tương lai không phải feature để chấm trước click.
 - Nhóm đối thủ có 24 cột và mức thiếu khác nhau đáng kể, không phải toàn bộ đều thiếu 93–98%. Không khẳng định NA lịch sử = khách mới hoặc NA đối thủ = không có cạnh tranh.
-- Các dòng cùng search phụ thuộc nhau. Báo cáo giữ cấu trúc nhóm, phân tích vị trí cùng random_bool và chưa thiết kế mô hình/chia tập.
+- Các dòng cùng search phụ thuộc nhau. Báo cáo giữ cấu trúc nhóm, phân tích vị trí cùng random_bool và đề xuất đánh giá theo thời gian/nhóm search; chưa tạo tập chia hoặc huấn luyện.
 
 ## 5. Cách đọc các kết quả EDA
 

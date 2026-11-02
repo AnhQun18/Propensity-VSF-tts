@@ -170,6 +170,9 @@ class Report:
             self.sections[-1] = reproducibility_section(self, environment)
             from scripts.airbnb_report_presentation import prepare_publication
             prepare_publication(self)
+        else:
+            from scripts.hotel_expedia_research import prepare_publication
+            prepare_publication(self)
         parts = [f"# {self.title}",
                  "> Phạm vi: EDA trên dữ liệu gốc. Không làm sạch/thay thế dữ liệu, không tạo tập feature, không huấn luyện mô hình.",
                  f"Ngày phân tích: {datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).date().isoformat()}. Đây không phải ngày thu thập dữ liệu."]
@@ -199,6 +202,9 @@ class Report:
                 "executive_numeric_checks": getattr(self, "executive_numeric_checks", []),
                 "rendered_tables_sha256": getattr(self, "rendered_tables_sha256", [])} if self.dataset == "AIRBNB" else {}),
             **({"full_train_script_sha256": hashlib.sha256((self.root / "scripts/expedia_full_train.py").read_bytes()).hexdigest()} if self.dataset == "EXPEDIA" else {}),
+            **({"research_script_sha256": hashlib.sha256((self.root / "scripts/hotel_expedia_research.py").read_bytes()).hexdigest(),
+                "rendered_tables_sha256": self.rendered_tables_sha256,
+                "executive_evidence": self.executive_evidence} if self.dataset in {"HOTEL", "EXPEDIA"} else {}),
             "environment": dict(environment.itertuples(index=False, name=None)),
             "section_keys": [s["key"] for s in self.sections],
             "download_date": "not_recorded" if self.dataset == "AIRBNB" else None,
@@ -217,7 +223,7 @@ def show_section(report, key):
         if s["text"]: display(Markdown(s["text"]))
         for label, table in s["tables"]:
             display(Markdown(f"**{label}**"))
-            if report.dataset == "AIRBNB":
+            if report.dataset in {"AIRBNB", "HOTEL", "EXPEDIA"}:
                 display(Markdown(md_table(table)))
             else:
                 with pd.option_context("display.max_rows", max(100, len(table)), "display.max_columns", 30,
@@ -641,7 +647,7 @@ def scan_expedia(path, training, store=None):
               "promotion_flag","srch_saturday_night_bool","random_bool"]
     dictionary_categories=cat_cols+["srch_destination_id"]+[f"comp{i}_{kind}" for i in range(1,9) for kind in ["rate","inv"]]+(["position","click_bool","booking_bool"] if training else [])
     cat_parts={c:[] for c in dictionary_categories}
-    group_parts={c:[] for c in cat_cols+["price_group","window_group","year_month","random_bool_position"]} if training else {}
+    group_parts={c:[] for c in cat_cols+["price_group","window_group","year_month","random_bool_position", "random_star", "random_price"]} if training else {}
     for chunk in pd.read_csv(path,chunksize=CHUNK_SIZE):
         rows+=len(chunk)
         progress(f"{path.name}: {rows:,} rows")
@@ -668,7 +674,7 @@ def scan_expedia(path, training, store=None):
             nonbooking_gross+=int((chunk.booking_bool.eq(0)&chunk.gross_bookings_usd.notna()).sum())
             bad_labels+=int((~chunk.click_bool.isin([0,1])|~chunk.booking_bool.isin([0,1])).sum())
             query_diag=chunk.assign(_date_ns=pd.to_datetime(chunk.date_time,format="%Y-%m-%d %H:%M:%S").astype("int64"))
-            query_parts.append(query_diag.groupby("srch_id",sort=False).agg(n=("prop_id","size"),clicks=("click_bool","sum"),bookings=("booking_bool","sum"),date_min=("_date_ns","min"),date_max=("_date_ns","max")))
+            query_parts.append(query_diag.groupby("srch_id",sort=False).agg(n=("prop_id","size"),clicks=("click_bool","sum"),bookings=("booking_bool","sum"),date_min=("_date_ns","min"),date_max=("_date_ns","max"),random_min=("random_bool","min"),random_max=("random_bool","max")))
             for c in cat_cols:
                 group_parts[c].append(chunk.groupby(c,dropna=False).agg(n=("srch_id","size"),clicks=("click_bool","sum"),bookings=("booking_bool","sum")).reset_index())
             price_group=pd.cut(chunk.price_usd,[-np.inf,0,50,100,150,250,500,1000,np.inf],labels=["<=0","(0,50]","(50,100]","(100,150]","(150,250]","(250,500]","(500,1000]",">1000"])
@@ -677,6 +683,9 @@ def scan_expedia(path, training, store=None):
                 tmp=pd.DataFrame({name:labels,"click_bool":chunk.click_bool,"booking_bool":chunk.booking_bool,"srch_id":chunk.srch_id})
                 group_parts[name].append(tmp.groupby(name,observed=True,dropna=False).agg(n=("srch_id","size"),clicks=("click_bool","sum"),bookings=("booking_bool","sum")).reset_index())
             group_parts["random_bool_position"].append(chunk.groupby(["random_bool","position"],dropna=False).agg(n=("srch_id","size"),clicks=("click_bool","sum"),bookings=("booking_bool","sum")).reset_index())
+            group_parts["random_star"].append(chunk.groupby(["random_bool", "prop_starrating"],dropna=False).agg(n=("srch_id","size"),clicks=("click_bool","sum"),bookings=("booking_bool","sum")).reset_index())
+            price_strata = chunk.assign(price_group=price_group)
+            group_parts["random_price"].append(price_strata.groupby(["random_bool", "price_group"],observed=True,dropna=False).agg(n=("srch_id","size"),clicks=("click_bool","sum"),bookings=("booking_bool","sum")).reset_index())
         else:
             query_diag=chunk.assign(_date_ns=pd.to_datetime(chunk.date_time,format="%Y-%m-%d %H:%M:%S").astype("int64"))
             query_parts.append(query_diag.groupby("srch_id",sort=False).agg(n=("prop_id","size"),date_min=("_date_ns","min"),date_max=("_date_ns","max")))
@@ -684,7 +693,7 @@ def scan_expedia(path, training, store=None):
     pairs=pd.DataFrame({"srch_id":np.concatenate(pairs_a),"prop_id":np.concatenate(pairs_b)})
     duplicate_pairs=int(pairs.duplicated().sum())
     del pairs,pairs_a,pairs_b
-    query=pd.concat(query_parts).groupby(level=0).agg({"n":"sum",**({"clicks":"sum","bookings":"sum"} if training else {}),"date_min":"min","date_max":"max"})
+    query=pd.concat(query_parts).groupby(level=0).agg({"n":"sum",**({"clicks":"sum","bookings":"sum", "random_min":"min", "random_max":"max"} if training else {}),"date_min":"min","date_max":"max"})
     stats=[]
     for c in numeric_cols:
         vns=ns[c]; mean=sums[c]/vns if vns else np.nan
@@ -696,7 +705,8 @@ def scan_expedia(path, training, store=None):
         store.finish()
         stats=full_numeric_statistics(store,stats)
     cat={c:_combine_group(parts,[c]) for c,parts in cat_parts.items()}
-    groups={c:_combine_group(parts,["random_bool","position"] if c=="random_bool_position" else [c]) for c,parts in group_parts.items()}
+    group_keys = {"random_bool_position": ["random_bool", "position"], "random_star": ["random_bool", "prop_starrating"], "random_price": ["random_bool", "price_group"]}
+    groups={c:_combine_group(parts,group_keys.get(c,[c])) for c,parts in group_parts.items()}
     for g in groups.values():
         g["click_pct"]=g.clicks/g.n*100; g["booking_pct"]=g.bookings/g.n*100
     return dict(rows=rows,missing=missing,dtypes=dtypes,stats=stats,store=store,queries=query,
@@ -822,6 +832,8 @@ Không class weighting, resampling, imputation, clipping, encoding, feature engi
 """)
     from scripts.eda_diagnostics import enrich_expedia
     enrich_expedia(r,train,test)
+    from scripts.hotel_expedia_research import deepen_expedia
+    deepen_expedia(r,train,test)
     return r.publish()
 
 
@@ -834,6 +846,10 @@ def make_notebook(root, dataset):
     from scripts.eda_diagnostics import SECTION_LAYOUT
     titles = {dataset: [title for key,title in SECTION_LAYOUT]}
     keys = {dataset: [key for key,title in SECTION_LAYOUT]}
+    if dataset in {"HOTEL", "EXPEDIA"}:
+        from scripts.hotel_expedia_research import LAYOUT
+        titles[dataset] = [title for key, title in LAYOUT]
+        keys[dataset] = [key for key, title in LAYOUT]
     cells = [nbf.v4.new_markdown_cell(f"# {dataset} — Báo cáo hiểu sâu dữ liệu\n\n**Phạm vi: EDA trên dữ liệu gốc; chưa feature engineering, chưa huấn luyện mô hình.**\n\nBáo cáo có từ điển dữ liệu, kiểm tra chất lượng/khóa/nhãn, thống kê theo nhóm, thời gian và giới hạn suy rộng. Các kết quả được tính lại từ CSV; bản đọc nhanh nằm ở `reports/{dataset}/README.md`.\n\nMọi phân nhóm tạm thời chỉ phục vụ mô tả, không tạo tập feature. Chạy tất cả các cell theo thứ tự; cell đầu quét dữ liệu đầy đủ nên có thể mất vài phút với Expedia. Phần tóm tắt điều hành nằm đầu; bảng kiểm kê dài chuyển sang phụ lục. Mỗi hình có nhận xét riêng ngay bên dưới."),
              nbf.v4.new_code_cell("from pathlib import Path\nimport importlib\nimport sys\n\nPROJECT_ROOT = Path.cwd().resolve()\nwhile not (PROJECT_ROOT / 'data' / 'raw').is_dir():\n    if PROJECT_ROOT == PROJECT_ROOT.parent:\n        raise FileNotFoundError('Không tìm thấy data/raw; hãy mở notebook trong dự án Propensity.')\n    PROJECT_ROOT = PROJECT_ROOT.parent\nif str(PROJECT_ROOT) not in sys.path:\n    sys.path.insert(0, str(PROJECT_ROOT))\nfrom scripts import build_descriptive_reports as eda\nimportlib.reload(eda)\n"+f"report = eda.build_report('{dataset}', PROJECT_ROOT)\n"+"print('Đã tính lại từ CSV raw; số chính:', report.facts)\nprint('Chỉ xuất báo cáo, metadata và biểu đồ; không tạo dữ liệu mô hình.')")]
     if dataset == "AIRBNB":
@@ -903,7 +919,9 @@ Ngày phân tích: {datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).date().isoformat(
 6. **Đuôi giá và missing cần quy tắc rõ:** mỗi bộ đã có bảng hàng rào 1,5×IQR, tỷ lệ outlier, heatmap missing và ma trận tương quan. Expedia tính percentile, skewness, outlier, Spearman và missing theo nhãn trên toàn bộ train; chỉ scatter/pattern missing giới hạn số điểm hiển thị. Số liệu nằm cạnh hình ở từng báo cáo.
 7. **Khả năng sử dụng có điều kiện:** HOTEL cho hủy/no-show, AIRBNB cho booking đầu ở cấp user, EXPEDIA cho search/ranking. Tất cả còn câu hỏi về t0/phạm vi áp dụng; ngày tải raw chưa được ghi nhận, giấy phép/điều khoản được trình bày tại nguồn của từng bộ, không gán mặc định quyền sử dụng mở.
 
-Các báo cáo chi tiết cùng cấu trúc: tổng quan nguồn/phiên bản → chất lượng → đơn biến → đa biến/thời gian/nhóm con → rủi ro → kết luận và đề xuất; executive summary ở đầu, từ điển/bảng dài ở phụ lục. Mỗi hình có nhận xét định lượng ngay bên dưới. Đề xuất xử lý thiếu, mã hóa, feature engineering và mô hình chỉ là hướng cho giai đoạn sau, chưa thực hiện.
+Các báo cáo chi tiết cùng cấu trúc: thuật ngữ → tóm tắt điều hành → bài toán → nguồn/phiên bản → chất lượng → đơn biến → nhãn/đa biến/thời gian/nhóm con → giới hạn → thuật toán và thiết kế đánh giá. Từ điển, quyết định từng cột, bảng dài và truy vết tóm tắt nằm ở phụ lục. Các lịch chia tập và ngưỡng chấp nhận là đề xuất; chưa tạo tập học hoặc huấn luyện mô hình.
+
+HOTEL bổ sung liên hệ của 29 cột ứng viên, độ nhạy raw/bỏ trùng/từng khách sạn, chuẩn hóa cơ cấu phân khúc và quyết định vai trò cho đủ 32 cột. Thiết kế so sánh LR có tương tác với CatBoost; lịch theo tháng đến chỉ dùng chẩn đoán hồi cứu khi chưa có snapshot tại t0. EXPEDIA bổ sung liên hệ với hai nhãn, trọng số theo dòng/search, phân tầng giá/sao theo cơ chế hiển thị và quyết định vai trò đủ 54 cột. Thiết kế xác suất so sánh LR với LightGBM binary; LambdaRank là nhánh xếp hạng riêng. Khoảng đệm nhãn Expedia chưa được xác nhận; không coi lịch đề xuất là bằng chứng nhãn đã hoàn tất.
 
 ## 1. Kết luận phục vụ lựa chọn bài toán
 
@@ -972,7 +990,7 @@ Tỷ lệ theo booking, user và cặp search-property trả lời các câu h�
 - Train có {count(e['searches'])} searches, **{count(e['searches_without_click'])} search không click**. Không suy rộng tỷ lệ trong tập thành tỷ lệ tương tác của toàn website; cần xác minh cơ chế chọn mẫu.
 - `gross_bookings_usd` là kết quả sau booking. `position` không có trong test; click tương lai không phải feature để chấm trước click.
 - Nhóm đối thủ có 24 cột và mức thiếu khác nhau đáng kể, không phải toàn bộ đều thiếu 93–98%. Không khẳng định NA lịch sử = khách mới hoặc NA đối thủ = không có cạnh tranh.
-- Các dòng cùng search phụ thuộc nhau. Báo cáo giữ cấu trúc nhóm, phân tích vị trí cùng random_bool và chưa thiết kế mô hình/chia tập.
+- Các dòng cùng search phụ thuộc nhau. Báo cáo giữ cấu trúc nhóm, phân tích vị trí cùng random_bool và đề xuất đánh giá theo thời gian/nhóm search; chưa tạo tập chia hoặc huấn luyện.
 
 ## 5. Cách đọc các kết quả EDA
 
@@ -1067,6 +1085,9 @@ def main():
         if dataset == "AIRBNB":
             from scripts.airbnb_report_presentation import verify_artifacts
             verify_artifacts(root, nb)
+        else:
+            from scripts.hotel_expedia_research import verify_artifacts
+            verify_artifacts(root, dataset, nb)
     if all((root/"reports"/d/"analysis_metadata.json").exists() for d in ["HOTEL","AIRBNB","EXPEDIA"]):
         write_summary(root)
         print("Updated reports/README.md",flush=True)

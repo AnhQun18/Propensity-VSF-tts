@@ -10,11 +10,114 @@
     "deduplicated_rate": 0.27489816467572886,
     "figure_seed": 42,
     "download_date": null,
-    "rules_checked_on": "2026-11-01"
+    "rules_checked_on": "2026-11-01",
+    "columns_association_audited": 29,
+    "standardized_gap_pp": 11.690076396122791,
+    "protocol_kind": "arrival_cohort_diagnostic_only",
+    "columns_with_usage_decision": 32,
+    "research_revision": "hotel_expedia_airbnb_structure_v1",
+    "research_evidence_sha256": "f853c83edf8d0627d1916d6f710f40f66b0c7342c827b5ae599cdc46084fb9ee"
   },
-  "analysis_date": "2026-11-01",
-  "script_sha256": "7284f1b9b8512f1b3101a0bf1b4ad32aed8664a639d9116b410d576dadd7c501",
-  "diagnostics_script_sha256": "c08327af9b46a4d313e59b60afb8a3d045e3436f0b25af63b6e3774ea2cf3933",
+  "analysis_date": "2026-11-02",
+  "script_sha256": "1ef214b0ac53762f579007756793286c9e22dcab070d3d048e04cafab0b74296",
+  "diagnostics_script_sha256": "9e370009529921096180542336db80e9ba3c869d48ef9dce089cfba522e6c521",
+  "research_script_sha256": "01c5377e5dc04287d984268a673a3db00562c544aadcaec0b724cdf421ba8d00",
+  "rendered_tables_sha256": [
+    "060bb53212f231f9b160fda0a1748737e9e71ba08274d0c2f4953b767f19314e",
+    "081aa40a1f2205e411e56d121d96fd3728878ea17df67df18631185aaefebaef",
+    "1065c0f1de9bed21ebc581b142bfce70b305e9908c175fda3c47b3667bbe2e68",
+    "1141d8e33915e8c43cf9087b00ead560cda4fcb4c061354eb5a97aa814410d26",
+    "1e77c4b4c65f73ab843237757b8aa4ed911d7c8cc974c0665605ebefba6182f4",
+    "22973a40211c9c4c6ac1a30b06cf45596e65c66957a7ae3fd946e127ae76574f",
+    "238931bfb4775c880425d6114fba3df88065380d594518a64c8e6b3e685e0cc7",
+    "24adb04af321c4f12d46227c794694be6d6553bd7868b975e0480450af440330",
+    "25cb1e346532e802d06520714fa6bd77d5e7f8227cb2368c040db0c0f22e4bdc",
+    "264f32aff5c90125d55f9cc82a700b1bc0abf5e38f8fe4875c335e671b1aeaec",
+    "2774e6a8eeeaf13fd01772c3d702fd370c6be953abe1c7c3e68b4ec91de96cf3",
+    "2774e6a8eeeaf13fd01772c3d702fd370c6be953abe1c7c3e68b4ec91de96cf3",
+    "32845a67652985dfda171359cceeb5f90a4ce2165a89ec97b23444a429a50517",
+    "36fd097caede7e58188e50fd7339965ca0c6d20bb08431e5199e02a91ad80079",
+    "41d3d630ff7e6c89879c2461bb44720eb394ab17e575643f6c147634e92059f4",
+    "4490dab53fd9f0182dee3aa61d6d6a501054d3b8f4b4d9acc1f6cb22e251eeea",
+    "4994307b11efc25bbecd400d6340393eddc4ae00d5945e6a8da6a2dba5be8805",
+    "533464823baac0a055c6050b5843aa52a69cfc73e01c814cec2624bdd05963fc",
+    "564a406616445a203627f8f5d233345c3c3b83e7f0b3d01de076e04aff88a9f1",
+    "5a59cdd58b8afbe7bd6ed598cf8c0d7c622eea6c7e5269c4db3d7b1dc5ef04ec",
+    "5c705f2dba7a33e9a2ab18c34de9bf256226392e387e70bbbd3c44a4fd4c47c5",
+    "69a1349b3bfc6b8dd7d73eeab11b463509264ef1cc3658a79a2d1d316f56eb46",
+    "7cc7f0b7c36a82f9563cbb1d06da96ce67526e26c5e24111f4a07a360be3c764",
+    "7d17b56f84df050acb60695a94d23a013c467caf7288b3d08988ac04e1f15b1c",
+    "8054ee8234b4e971c921932ad84127c676261039cf3c23403fb20a3661d21693",
+    "9301324660a742e82250cb707c84cc01bc192db2d0943719ef37d2a174f14f29",
+    "9b81c54e43ae844926d525e0fbf16ddb0ab1a22432d18ec3247e1e578a4b9f20",
+    "9dbe96e02669badfcfb709a1ced1c3f81f3d5d17c25b94d6a2416902e87a924e",
+    "a0adc381e96edbe8bd8ec220a337380cde92d8c3f0a24f639da0b37143c209f0",
+    "a27c37e7853a99303d34abf48045716fca3d698bfde6171190ddaed7d1b66bc2",
+    "aa37428e9341653c68451c3cf6faecf8b4bf1d77f90a368ae3db7b157f3da8ba",
+    "ae3d179d25f51868f68674b615ea4079425b56ce2191c9f6e1f9df223a35696b",
+    "b27cc15953ae55eefbbd93a34509607f536160efe59f8b5b08096d6f7b408f72",
+    "b57decee32e4d18e0f36c3a5ae5ea4bef18df6a6f717b4a27384804180be74dd",
+    "c335ba5d2b340815dff13ef6a53c6149af4ee3959173fb1c8ff7e72dda1af417",
+    "c3ac31383838af4657a405633cc49fdd3a0ee1e9f275e1fa372126cdee7539a5",
+    "c463326a50c5d315c334e3115780cfc4025b7150e01a9528cc6d8c353d1af412",
+    "c62323f4652fe0e4d54fded4bd21496e7fa1953536af673f1529546786043253",
+    "cd707e5e956911189517c4429edba241b2d5ce0f6b649dd2a0af1606db1b2a58",
+    "da581e19dcac1024cf32d557e946671649919604e21c3c8d40bc05aeea2e6387",
+    "de9ac27ab1733fada494510610858ae0c1c12f33a7a4237a9aa6e061e4723dbc",
+    "de9ac27ab1733fada494510610858ae0c1c12f33a7a4237a9aa6e061e4723dbc",
+    "e69c2897127356501bc4ed14330c27ffba97f8d5f23ee0e3d9f4702cddfb88bd",
+    "ec5afebcad212602d2af3c1db66eb5f9623fc02de3988be657658adbb3fa4c30",
+    "eea4ba37a51bbd04b553dac1e2fb82076d664a4a5a0c1d01e050c6c45df0b72a",
+    "f7a86e35bbba3ffbbe68a643f75b478d3c3576486003d82b8142bea986d81f5d"
+  ],
+  "executive_evidence": [
+    {
+      "finding": "**Đơn vị và quy mô:** 119,390 booking × 32 cột, chỉ hai cơ sở; không có khóa khách hàng.",
+      "section_key": "dictionary",
+      "values": {
+        "rows": 119390,
+        "columns": 32
+      }
+    },
+    {
+      "finding": "**Nhãn:** 44,224 hủy/no-show (37.04%); bảng chéo xác nhận nhãn 0 là Check-Out.",
+      "section_key": "quality",
+      "values": {
+        "positive": 44224,
+        "rate": 0.37041628277075134
+      }
+    },
+    {
+      "finding": "**Độ nhạy trùng:** 31,994 dòng trùng; giả định bỏ trùng còn 87,396, tỷ lệ 27.49%. Chưa quyết định xóa.",
+      "section_key": "duplicate_by_hotel",
+      "values": {
+        "duplicates": 31994,
+        "deduplicated_rows": 87396,
+        "deduplicated_rate": 0.27489816467572886
+      }
+    },
+    {
+      "finding": "**Khác biệt cơ sở:** City 41.73% so với Resort 27.76%; cần đọc cùng chuẩn hóa phân khúc.",
+      "section_key": "stratification",
+      "values": {
+        "city_pct": 41.72696331778646,
+        "resort_pct": 27.763354967548675
+      }
+    },
+    {
+      "finding": "**Liên hệ và đầu vào:** đã kiểm tra 29 cột ứng viên; cả 32 cột raw có quyết định vai trò. Liên hệ mạnh chưa bảo đảm hợp lệ tại t0.",
+      "section_key": "signal",
+      "values": {
+        "audited": 29,
+        "decisions": 32
+      }
+    },
+    {
+      "finding": "**Thiết kế đề xuất:** LR có tương tác so với CatBoost trên cùng nhánh hợp lệ; chia theo thời gian, hiệu chỉnh OOF và kiểm tra độ nhạy trùng. Lịch theo tháng đến chỉ là chẩn đoán hồi cứu khi chưa có snapshot.",
+      "section_key": "design",
+      "values": {}
+    }
+  ],
   "environment": {
     "Python": "3.14.2",
     "pandas": "2.3.3",
@@ -24,13 +127,15 @@
     "Chunk CSV lớn": "250000"
   },
   "section_keys": [
+    "glossary",
     "executive",
+    "problem",
     "overview",
     "quality_main",
     "univariate",
     "multivariate_main",
     "risks",
-    "conclusion_main",
+    "design",
     "appendix",
     "reproducibility"
   ],
@@ -38,12 +143,15 @@
   "download_date_note": "Chưa được ghi nhận; không suy từ mtime/ctime.",
   "figure_seed": 42,
   "figure_notes": {
-    "missing_patterns.png": "Nhận xét: company thiếu 94.31% trong toàn bộ booking HOTEL; chênh lệch missing lớn nhất giữa các nhóm is_canceled là 7.26 điểm phần trăm ở agent. Ô xanh là NA. Mẫu dòng hiển thị dùng seed=42; việc sắp theo pattern chỉ để nhìn cụm thiếu, không phải thứ tự thời gian. Các khác biệt này không đủ kết luận cơ chế MCAR/MAR/MNAR.",
-    "outliers_and_target.png": "Nhận xét: theo hàng rào Q1−1,5×IQR và Q3+1,5×IQR, adr có 3,793/119,390 giá trị bị gắn cờ (3.18%) trong toàn bộ booking HOTEL; đây là bất thường thống kê, chưa phải lỗi nhập liệu. Median lead_time theo nhãn: 0=45.00, 1=113.00. Boxplot bên phải ẩn các điểm ngoài whisker để đọc vùng giữa, không xóa chúng khỏi bảng hay raw. Đơn vị xem từ điển; IQR=0 ở biến rời rạc có thể gắn cờ nhiều giá trị thật. Trục x boxplot raw dùng symlog; hàng rào IQR vẫn tính trên giá trị raw, không phải log.",
-    "categories_and_target.png": "Nhận xét: market_segment có 8 nhóm (kể cả NA); 1 nhóm dưới 100 quan sát. Nhóm lớn nhất Online TA có 56,477 observations, tỷ lệ nhãn 1 là 36.72%. Hai trục trả lời số lượng nhóm và tỷ lệ bên trong nhóm, không dùng lẫn mẫu số; chênh lệch quan sát chưa được điều chỉnh theo cohort/biến khác.",
-    "multivariate.png": "Nhận xét: trong toàn bộ booking HOTEL, cặp có |rho| lớn nhất của ma trận công bố là lead_time–stays_in_week_nights (rho=0.296); riêng lead_time–adr có rho=0.015. Scatter chỉ hiển thị tối đa 4.000 cặp không thiếu, seed=42; đơn vị từng biến xem từ điển. Heatmap dùng dữ liệu toàn bộ booking HOTEL, không chỉ các điểm scatter. Tương quan cao là dấu hiệu chồng lặp để kiểm tra, không tự chứng minh đa cộng tuyến tuyến tính hoặc quan hệ nhân quả. Trục y của scatter dùng thang symlog để đọc đuôi dài; giá trị raw không bị biến đổi/lưu lại.",
-    "distributions.png": "Nhận xét: lead_time có median 69 ngày so với mean 104.01, thể hiện đuôi phải; ADR median 94.58, max 5400.00. Biểu đồ ADR chỉ vẽ 0–500, có 4 dòng ngoài vùng nhìn; thống kê vẫn giữ tất cả.",
-    "target_by_hotel.png": "Nhận xét: tỷ lệ hủy/no-show City Hotel 41.73% và Resort Hotel 27.76%, chênh 13.96 điểm phần trăm. Đây là khác biệt giữa hai cơ sở có cơ cấu khách khác nhau, không phải tác động riêng của loại khách sạn.",
-    "calendar.png": "Nhận xét: tỷ lệ nhãn theo tháng đến gộp hai cơ sở dao động 20.77–45.35%; số booking và tỷ lệ hủy thay đổi theo thời gian và khách sạn. Các tháng có số năm bao phủ khác nhau, nên chưa kết luận mùa vụ lặp ổn định chỉ từ đường này."
+    "missing_patterns.png": "**Quan sát:** company thiếu 94.31% trong toàn bộ booking HOTEL; chênh lệch missing lớn nhất giữa các nhóm is_canceled là 7.26 điểm phần trăm ở agent. Ô xanh là NA. Mẫu dòng hiển thị dùng seed=42; việc sắp theo pattern chỉ để nhìn cụm thiếu, không phải thứ tự thời gian. Các khác biệt này không đủ kết luận cơ chế MCAR/MAR/MNAR.\n\n**Phạm vi và cách đọc:** Bảng tổng hợp dùng toàn bộ dữ liệu; hình pattern tối đa 300 dòng seed=42. Không xác định cơ chế MCAR/MAR/MNAR.",
+    "outliers_and_target.png": "**Quan sát:** theo hàng rào Q1−1,5×IQR và Q3+1,5×IQR, adr có 3,793/119,390 giá trị bị gắn cờ (3.18%) trong toàn bộ booking HOTEL; đây là bất thường thống kê, chưa phải lỗi nhập liệu. Median lead_time theo nhãn: 0=45.00, 1=113.00. Boxplot bên phải ẩn các điểm ngoài whisker để đọc vùng giữa, không xóa chúng khỏi bảng hay raw. Đơn vị xem từ điển; IQR=0 ở biến rời rạc có thể gắn cờ nhiều giá trị thật. Trục x boxplot raw dùng symlog; hàng rào IQR vẫn tính trên giá trị raw, không phải log.\n\n**Phạm vi và cách đọc:** Quần thể, mẫu số và cửa sổ hiển thị ghi trên hình và bảng cạnh hình. Giữ nguyên giá trị raw; nhóm nhỏ cần đọc thận trọng.",
+    "categories_and_target.png": "**Quan sát:** market_segment có 8 nhóm (không có NA); 1 nhóm dưới 100 quan sát. Nhóm lớn nhất Online TA có 56,477 quan sát, tỷ lệ nhãn 1 là 36.72%. Hai trục trả lời số lượng nhóm và tỷ lệ bên trong nhóm, không dùng lẫn mẫu số; phân tầng cohort được trình bày tại phần đa biến.\n\n**Phạm vi và cách đọc:** Quần thể, mẫu số và cửa sổ hiển thị ghi trên hình và bảng cạnh hình. Giữ nguyên giá trị raw; nhóm nhỏ cần đọc thận trọng.",
+    "multivariate.png": "**Quan sát:** trong toàn bộ booking HOTEL, cặp có |rho| lớn nhất của ma trận công bố là lead_time–stays_in_week_nights (rho=0.296); riêng lead_time–adr có rho=0.015. Scatter chỉ hiển thị tối đa 4.000 cặp không thiếu, seed=42; đơn vị từng biến xem từ điển. Heatmap dùng dữ liệu toàn bộ booking HOTEL, không chỉ các điểm scatter. Tương quan cao là dấu hiệu chồng lặp để kiểm tra, không tự chứng minh đa cộng tuyến tuyến tính hoặc quan hệ nhân quả. Trục y của scatter dùng thang symlog để đọc đuôi dài; giá trị raw không bị biến đổi/lưu lại.\n\n**Phạm vi và cách đọc:** Tương quan dùng từng cặp không thiếu; scatter tối đa 4.000 điểm chỉ để hiển thị.",
+    "distributions.png": "**Quan sát:** lead_time có median 69 ngày so với mean 104.01, thể hiện đuôi phải; ADR median 94.58, max 5400.00. Biểu đồ ADR chỉ vẽ 0–500, có 4 dòng ngoài vùng nhìn; thống kê vẫn giữ tất cả.\n\n**Phạm vi và cách đọc:** Quần thể, mẫu số và cửa sổ hiển thị ghi trên hình và bảng cạnh hình. Giữ nguyên giá trị raw; nhóm nhỏ cần đọc thận trọng.",
+    "target_by_hotel.png": "**Quan sát:** tỷ lệ hủy/no-show City Hotel 41.73% và Resort Hotel 27.76%, chênh 13.96 điểm phần trăm. Đây là khác biệt giữa hai cơ sở có cơ cấu khách khác nhau, không phải tác động riêng của loại khách sạn.\n\n**Phạm vi và cách đọc:** Quần thể, mẫu số và cửa sổ hiển thị ghi trên hình và bảng cạnh hình. Giữ nguyên giá trị raw; nhóm nhỏ cần đọc thận trọng.",
+    "calendar.png": "**Quan sát:** tỷ lệ nhãn theo tháng đến gộp hai cơ sở dao động 20.77–45.35%; số booking và tỷ lệ hủy thay đổi theo thời gian và khách sạn. Các tháng có số năm bao phủ khác nhau, nên chưa kết luận mùa vụ lặp ổn định chỉ từ đường này.\n\n**Phạm vi và cách đọc:** Số lượng và tỷ lệ theo năm–tháng; tháng đầu/cuối có thể thiếu ngày. Không kết luận mùa vụ chỉ từ số tháng gộp.",
+    "association_strength.png": "**Quan sát:** bảng cạnh hình đối chiếu liên hệ trước và sau giả định bỏ dòng trùng; độ nhạy cần được xét trước lựa chọn mô hình.\n\n**Phạm vi và cách đọc:** toàn bộ booking trong từng kịch bản; biến phân loại gồm missing, biến số bỏ NA riêng từng cột. Hai thước đo có trục riêng. Cột có liên hệ mạnh vẫn bị chặn nếu chưa có bằng chứng tại t0.",
+    "observation_structure.png": "**Quan sát:** mỗi booking có một kết quả cuối, nhưng không có khóa booking/khách hàng để xác minh dòng trùng.\n\n**Phạm vi và cách đọc:** sơ đồ cấu trúc dữ liệu raw hiện có, không biểu diễn quan hệ nhân quả.",
+    "evaluation_timeline.png": "**Quan sát:** các cửa sổ đánh giá dùng thứ tự thời gian và lịch sử mở rộng.\n\n**Phạm vi và cách đọc:** trục là ngày đến, chỉ dùng chẩn đoán hồi cứu. Vùng xanh còn phải lọc kết quả đã hoàn tất trước O theo bảng; không xác nhận đầu vào có tại t0 hoặc booking còn hiệu lực."
   }
 }
