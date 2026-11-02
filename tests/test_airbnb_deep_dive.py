@@ -8,9 +8,18 @@ from scripts.airbnb_deep_dive import (
     bh_qvalues, booking_delay_tables, categorical_association,
     session_action_counts, session_audit,
 )
+from scripts.airbnb_report_presentation import normalize_text
 
 
 class AirbnbDiagnosticTests(unittest.TestCase):
+    def test_number_formatting_preserves_intervals_and_grouped_counts(self):
+        text = "Xác suất [0,1]; tuổi [16,100]; hệ số [−1,1]; tỷ lệ 41,65%; V=0,207; n=213,451"
+        self.assertEqual(normalize_text(text), "Xác suất [0; 1]; tuổi [16; 100]; hệ số [−1; 1]; tỷ lệ 41.65%; V=0.207; n=213,451")
+
+    def test_number_formatting_keeps_numeric_cells_numeric(self):
+        for value in [0.4165, 213451, True, None]:
+            self.assertIs(normalize_text(value), value)
+
     def test_cramers_v_independence_and_perfect_association(self):
         y = pd.Series([0, 0, 1, 1])
         independent = categorical_association(pd.Series(["a", "b", "a", "b"]), y)

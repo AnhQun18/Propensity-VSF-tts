@@ -35,6 +35,10 @@ AIRBNB_LAYOUT = [
     ("appendix", "Phụ lục — từ điển và bảng bổ sung"),
     ("reproducibility", "Tái lập và kiểm soát phạm vi"),
 ]
+from scripts.airbnb_report_presentation import STAGE
+if STAGE >= 3:
+    AIRBNB_LAYOUT = [(key, "6. Tổng hợp giới hạn và mức độ phù hợp" if key == "risks" else title)
+                     for key, title in AIRBNB_LAYOUT if key != "conclusion_main"]
 
 
 def session_action_counts(chunk):
@@ -269,11 +273,17 @@ def proposed_protocol(train, account):
 
 def reproducibility_section(report, environment):
     return section("reproducibility", "Tái lập và kiểm soát phạm vi", """
-Để chạy lại notebook, cần thư mục scripts/ và năm CSV train_users_2.csv, test_users.csv, sessions.csv, countries.csv, age_gender_bkts.csv tại data/raw/AIRBNB/. Notebook đã lưu kết quả để đọc trực tiếp. Ô mở đầu hướng dẫn chuẩn bị thư mục và cài thư viện EDA. Dữ liệu gốc được lấy riêng theo hướng dẫn vì không được đính kèm kho mã.
+Để chạy lại notebook, cần thư mục scripts/ và năm CSV train_users_2.csv, test_users.csv, sessions.csv, countries.csv, age_gender_bkts.csv tại data/raw/AIRBNB/. Notebook đã lưu kết quả để đọc trực tiếp. Dữ liệu gốc được lấy riêng theo hướng dẫn vì không được đính kèm kho mã.
+
+Cài môi trường EDA từ thư mục gốc bằng lệnh dưới đây. Đây là hướng dẫn chuẩn bị, không phải ô phân tích dữ liệu:
+
+```powershell
+python -m pip install pandas==2.3.3 numpy==2.4.1 scipy==1.17.1 matplotlib==3.10.8 nbformat==5.10.4 ipython==9.9.0 tzdata
+```
 
 Từ thư mục gốc, chạy `python scripts/build_descriptive_reports.py --dataset AIRBNB`. Cách khác là mở notebook bằng Jupyter, chọn Restart Kernel rồi Run All. Script đọc CSV gốc và xuất báo cáo Markdown, metadata JSON, hình và notebook có kết quả thực thi.
 
-Người cung cấp xác nhận ngày 2026-11-02 rằng **ngày tải dữ liệu không được lưu**. Mã phiên bản Kaggle cũng chưa được ghi nhận. Vì vậy, bản dữ liệu đang dùng được nhận diện bằng SHA-256 của từng file và của danh mục file có thứ tự trong metadata. Ngày phân tích được ghi theo múi giờ Asia/Ho_Chi_Minh.
+**Hồ sơ dự án chưa có bằng chứng về ngày tải và mã phiên bản Kaggle.** Báo cáo để trạng thái chưa xác định và nhận diện bản dữ liệu đang dùng bằng SHA-256 của từng file cùng danh mục file trong metadata. Ngày phân tích được ghi theo múi giờ Asia/Ho_Chi_Minh và không thay thế ngày tải.
 
 Các bảng dùng toàn bộ người dùng hoặc toàn bộ sessions có khóa hợp lệ trong phạm vi ghi cạnh bảng. Hình về mẫu thiếu chỉ hiển thị tối đa 300 dòng với seed=42.
 
@@ -545,7 +555,7 @@ Ba việc cần hoàn tất là xác minh thông tin hồ sơ tại t0, làm rõ
         "Bảng so sánh các nhóm đăng ký từ tháng 1 đến tháng 6/2014. Các tỷ lệ trong ba cột within30/60/90 có mẫu số valid_observed_bookings, tức số lượt đặt chỗ có độ trễ hợp lệ của nhóm. Thời gian theo dõi của người có y=0 cần được xác định riêng.",
         [("Cohort 2014: NDF và mức bao phủ booking quan sát",pd.DataFrame(recent_lags))]))
     source = base["overview"]["blocks"][0]
-    source["tables"][0][1].loc[source["tables"][0][1]["item"].eq("Ngày tải raw"), "description"] = "Không được lưu; người cung cấp xác nhận 2026-11-02. Mã phiên bản Kaggle chưa có bằng chứng; dùng snapshot SHA-256."
+    source["tables"][0][1].loc[source["tables"][0][1]["item"].eq("Ngày tải raw"), "description"] = "Chưa có bằng chứng trong hồ sơ dự án về ngày tải hoặc mã phiên bản Kaggle. Bản dữ liệu được nhận diện bằng SHA-256."
     scope = base["overview"]["blocks"][1]
     overview = combine("overview", "2. Tổng quan bộ dữ liệu", [source, scope])
     base["quality_main"]["title"] = "3. Chất lượng dữ liệu"
@@ -579,9 +589,9 @@ Báo cáo dùng thống nhất “nhãn y” cho mục tiêu nhị phân và “
     ], columns=["Thuật ngữ", "Giải nghĩa"]))])
     findings = [
         f"**Quy mô và nhãn y:** tập train có {len(train):,} người dùng, trong đó {int(frame.observed_booking.sum()):,} người có lượt đặt chỗ đầu tiên ({frame.observed_booking.mean()*100:.2f}%). Tập test có {len(test):,} người dùng. Hai nhóm nhãn y có quy mô đủ lớn để bắt đầu thí nghiệm với phân phối lớp hiện có.",
-        f"**Thời gian phát sinh đặt chỗ:** trong {len(values):,} lượt đặt chỗ có độ trễ không âm, {coverage_at(30):.2f}% xảy ra trong 30 ngày, {coverage_at(60):.2f}% trong 60 ngày và {coverage_at(90):.2f}% trong 90 ngày. Vì phần lớn lượt đặt chỗ tập trung trong ba tháng đầu, 90 ngày là thời hạn đáng xem xét cho phương án triển khai.",
+        f"**Thời gian phát sinh đặt chỗ:** trong {len(values):,} lượt đặt chỗ có độ trễ không âm, {coverage_at(30):.2f}% xảy ra trong 30 ngày, {coverage_at(60):.2f}% trong 60 ngày và {coverage_at(90):.2f}% trong 90 ngày. Các tỷ lệ này chỉ tính trên người đã đặt chỗ và có độ trễ hợp lệ, không phải xác suất đặt chỗ của toàn bộ người dùng. Kết quả gợi ý xem xét thời hạn 90 ngày cho phương án triển khai.",
         f"**Liên hệ của hồ sơ đăng ký:** gender có V={v_by_name.loc['gender','effect_all']:.3f} trên toàn kỳ và {v_by_name.loc['gender','effect_2014']:.3f} trong năm 2014, được diễn giải ở mức yếu đến vừa trong báo cáo. signup_app có liên hệ yếu hơn, với V lần lượt là {v_by_name.loc['signup_app','effect_all']:.3f} và {v_by_name.loc['signup_app','effect_2014']:.3f}. Hai biến này là ứng viên để kiểm tra giá trị bổ sung trong mô hình.",
-        f"**Độ đầy đủ của hồ sơ tuổi:** age thiếu ở {train.age.isna().mean()*100:.2f}% người dùng. Trong năm 2014, cờ thiếu tuổi có V={age_signal.effect_2014:.3f}, còn tuổi trong dải 16–100 có rank-biserial={age_rank.effect_2014:.3f}, gần 0. Mức độ đầy đủ của hồ sơ có liên hệ đáng chú ý với nhãn y, trong khi khác biệt thứ hạng tuổi giữa hai nhóm rất nhỏ.",
+        f"**Độ đầy đủ của hồ sơ tuổi:** age thiếu ở {train.age.isna().mean()*100:.2f}% người dùng. Trong năm 2014, cờ thiếu tuổi có V={age_signal.effect_2014:.3f}, còn tuổi trong dải 16–100 có rank-biserial={age_rank.effect_2014:.3f}, gần 0. Mức độ đầy đủ của hồ sơ có liên hệ đáng chú ý với nhãn y, trong khi khác biệt thứ hạng tuổi giữa hai nhóm rất nhỏ. Chỉ được dùng tuổi và cờ thiếu tuổi nếu xác nhận chúng phản ánh hồ sơ tại t0, vì việc bổ sung hồ sơ sau đăng ký có thể làm lộ thông tin tương lai.",
         f"**Phạm vi nhật ký hoạt động:** trong năm 2014, {coverage_recent:.2f}% người dùng train và {coverage_test:.2f}% người dùng test có sessions, chênh {coverage_test-coverage_recent:.2f} điểm phần trăm. Tỷ lệ có đặt chỗ trong nhóm có nhật ký là {cov_absent.loc[True,'rate_pct']:.2f}%, so với {cov_absent.loc[False,'rate_pct']:.2f}% ở nhóm thiếu nhật ký. Vì dữ liệu trước năm 2014 không có sessions, nghiên cứu riêng nguồn này cần tập trung vào {recent_users:,} người dùng train đăng ký năm 2014.",
     ]
     next_steps = [
@@ -608,7 +618,7 @@ Báo cáo dùng thống nhất “nhãn y” cho mục tiêu nhị phân và “
     snapshot_text = "\n".join(f"{row.file}:{row.bytes}:{row.sha256}" for row in inventory.sort_values("file").itertuples())
     report.facts.pop("download_date", None)
     report.facts.update({
-        "download_date_status": "not_recorded_confirmed_by_provider_2026-11-02",
+        "download_date_status": "unknown_no_documentary_evidence",
         "dataset_version_status": "unknown_kaggle_version_local_snapshot_identified",
         "local_snapshot_sha256": hashlib.sha256(snapshot_text.encode()).hexdigest(),
         "valid_booking_lags": int(valid.sum()), "negative_booking_lags": int(lag.lt(0).sum()),
@@ -622,4 +632,14 @@ Báo cáo dùng thống nhất “nhãn y” cho mục tiêu nhị phân và “
         "proposed_deployment_horizon_days": 90,
         "fixed_horizon_negative_followup_verified": False,
         "analysis_revision": "airbnb_readability_and_terminology_v3",
+    })
+    from scripts.airbnb_report_presentation import capture_evidence
+    report.airbnb_context = {"train": train, "test": test, "frame": frame, "account": account, "first": first}
+    capture_evidence(report, {
+        "association": association, "delay": lag_summary, "horizons": horizons,
+        "delay_cohorts": lag_cohorts, "followup_sensitivity": followup,
+        "sessions_2014": s2014, "event_counts": event_summary, "actions": actions,
+        "protocol": proposed_protocol(train, account),
+        **{f"strata_{key}": value for key, value in strata.items()},
+        **{f"rates_{key}": rate_table(frame, key, "observed_booking") for key in display_columns},
     })

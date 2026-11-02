@@ -166,6 +166,8 @@ class Report:
         if self.dataset == "AIRBNB":
             from scripts.airbnb_deep_dive import reproducibility_section
             self.sections[-1] = reproducibility_section(self, environment)
+            from scripts.airbnb_report_presentation import prepare_publication
+            prepare_publication(self)
         parts = [f"# {self.title}",
                  "> Phạm vi: EDA trên dữ liệu gốc. Không làm sạch/thay thế dữ liệu, không tạo tập feature, không huấn luyện mô hình.",
                  f"Ngày phân tích: {datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).date().isoformat()}. Đây không phải ngày thu thập dữ liệu."]
@@ -188,11 +190,16 @@ class Report:
             "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             "diagnostics_script_sha256": hashlib.sha256((self.root / "scripts/eda_diagnostics.py").read_bytes()).hexdigest(),
             **({"airbnb_deep_dive_script_sha256": hashlib.sha256((self.root / "scripts/airbnb_deep_dive.py").read_bytes()).hexdigest()} if self.dataset == "AIRBNB" else {}),
+            **({"presentation_script_sha256": hashlib.sha256((self.root / "scripts/airbnb_report_presentation.py").read_bytes()).hexdigest(),
+                "completed_stages": getattr(self, "completed_stages", []),
+                "executive_evidence": getattr(self, "executive_evidence", []),
+                "executive_numeric_checks": getattr(self, "executive_numeric_checks", []),
+                "rendered_tables_sha256": getattr(self, "rendered_tables_sha256", [])} if self.dataset == "AIRBNB" else {}),
             **({"full_train_script_sha256": hashlib.sha256((self.root / "scripts/expedia_full_train.py").read_bytes()).hexdigest()} if self.dataset == "EXPEDIA" else {}),
             "environment": dict(environment.itertuples(index=False, name=None)),
             "section_keys": [s["key"] for s in self.sections],
             "download_date": "not_recorded" if self.dataset == "AIRBNB" else None,
-            "download_date_note": "Người cung cấp xác nhận không lưu ngày tải hoặc mã phiên bản Kaggle, 2026-11-02; định danh bản local bằng SHA-256." if self.dataset == "AIRBNB" else "Chưa được ghi nhận; không suy từ mtime/ctime.",
+            "download_date_note": "Chưa có bằng chứng trong hồ sơ dự án về ngày tải hoặc mã phiên bản Kaggle. Bản dữ liệu được nhận diện bằng SHA-256." if self.dataset == "AIRBNB" else "Chưa được ghi nhận; không suy từ mtime/ctime.",
             "figure_seed": 42,
             "figure_notes": self.figure_notes,
         }, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
@@ -207,9 +214,12 @@ def show_section(report, key):
         if s["text"]: display(Markdown(s["text"]))
         for label, table in s["tables"]:
             display(Markdown(f"**{label}**"))
-            with pd.option_context("display.max_rows", max(100, len(table)), "display.max_columns", 30,
-                                   "display.float_format", lambda x: f"{x:,.4f}"):
-                display(table)
+            if report.dataset == "AIRBNB":
+                display(Markdown(md_table(table)))
+            else:
+                with pd.option_context("display.max_rows", max(100, len(table)), "display.max_columns", 30,
+                                       "display.float_format", lambda x: f"{x:,.4f}"):
+                    display(table)
         for p in s["figures"]:
             display(Image(filename=str(p)))
             display(Markdown(report.figure_notes[p.name]))
@@ -821,37 +831,18 @@ def make_notebook(root, dataset):
              nbf.v4.new_code_cell("from pathlib import Path\nimport importlib\nimport sys\n\nPROJECT_ROOT = Path.cwd().resolve()\nwhile not (PROJECT_ROOT / 'data' / 'raw').is_dir():\n    if PROJECT_ROOT == PROJECT_ROOT.parent:\n        raise FileNotFoundError('Không tìm thấy data/raw; hãy mở notebook trong dự án Propensity.')\n    PROJECT_ROOT = PROJECT_ROOT.parent\nif str(PROJECT_ROOT) not in sys.path:\n    sys.path.insert(0, str(PROJECT_ROOT))\nfrom scripts import build_descriptive_reports as eda\nimportlib.reload(eda)\n"+f"report = eda.build_report('{dataset}', PROJECT_ROOT)\n"+"print('Đã tính lại từ CSV raw; số chính:', report.facts)\nprint('Chỉ xuất báo cáo, metadata và biểu đồ; không tạo dữ liệu mô hình.')")]
     if dataset == "AIRBNB":
         from scripts.airbnb_deep_dive import AIRBNB_LAYOUT
+        from scripts.airbnb_report_presentation import human_title
         keys[dataset] = [key for key, _ in AIRBNB_LAYOUT]
-        titles[dataset] = [title for _, title in AIRBNB_LAYOUT]
+        titles[dataset] = [human_title(title) for _, title in AIRBNB_LAYOUT]
         introduction = """# AIRBNB — Báo cáo dữ liệu và thiết kế nghiên cứu propensity
 
 **Phạm vi:** notebook phân tích mô tả dữ liệu gốc, gồm nhãn y, độ trễ và các nhóm đăng ký theo thời gian. Báo cáo đề xuất thiết kế thí nghiệm cho giai đoạn tiếp theo. Mọi số liệu là thống kê mô tả, chưa phải kết quả mô hình hoặc bằng chứng về tác động nhân quả.
 
 Bảng thuật ngữ và tóm tắt điều hành nằm ở đầu phần kết quả. Các bảng chi tiết được chuyển xuống phụ lục để thuận tiện tra cứu.
 
-Notebook có output lưu sẵn để đọc ngay. **Notebook phụ thuộc package scripts/ và CSV của dự án; một file notebook riêng không chạy độc lập.** Khi nộp cần kèm code và hướng dẫn lấy dữ liệu sau:
+Notebook đã lưu kết quả để đọc trực tiếp. Hướng dẫn chuẩn bị dữ liệu, cài môi trường và chạy lại được đặt ở mục **Tái lập và kiểm soát phạm vi** cuối báo cáo. Notebook cần mã trong thư mục scripts/ và dữ liệu CSV của dự án để chạy lại.
 
-    Propensity/
-      scripts/
-        __init__.py
-        build_descriptive_reports.py
-        eda_diagnostics.py
-        airbnb_deep_dive.py
-      data/raw/AIRBNB/
-        train_users_2.csv
-        test_users.csv
-        sessions.csv
-        countries.csv
-        age_gender_bkts.csv
-      notebooks/AIRBNB/airbnb_descriptive_report.ipynb
-
-CSV lấy từ cuộc thi Airbnb New User Bookings, không có trong Git. File sample_submission_NDF.csv là tùy chọn để kiểm kê, không dùng phân tích người dùng. Xem báo cáo Markdown được tạo tại reports/AIRBNB/README.md sau khi chạy.
-
-Môi trường EDA đã kiểm tra: Python 3.14.2; pandas 2.3.3, numpy 2.4.1, scipy 1.17.1, matplotlib 3.10.8, nbformat 5.10.4 và IPython 9.9.0. Có thể cài các thư viện EDA trong môi trường riêng bằng:
-
-    python -m pip install pandas==2.3.3 numpy==2.4.1 scipy==1.17.1 matplotlib==3.10.8 nbformat==5.10.4 ipython==9.9.0 tzdata
-
-Dùng Jupyter với kernel của môi trường đó, Restart Kernel và Run All từ đầu; hoặc chạy python scripts/build_descriptive_reports.py --dataset AIRBNB ở thư mục gốc. Lần chạy tạo lại báo cáo, hình và metadata từ CSV; ngày thực thi được lưu trong metadata notebook. Seed hiển thị hình =42. **Ngày tải raw không được lưu**, đã được người cung cấp xác nhận; dùng SHA-256 để đối chiếu snapshot.
+Quy ước số: dấu chấm biểu diễn phần thập phân; dấu phẩy phân tách hàng nghìn. Tên cột và mã giá trị được giữ nguyên trong từ điển dữ liệu để đối chiếu với CSV.
 """
         setup = """from pathlib import Path
 import importlib
@@ -865,7 +856,7 @@ PROJECT_ROOT = next((p for p in (cwd, *cwd.parents)
 if PROJECT_ROOT is None:
     raise FileNotFoundError('Notebook cần package scripts/ của dự án; xem cấu trúc thư mục trong ô mở đầu.')
 required = [PROJECT_ROOT / 'scripts' / name for name in
-            ['__init__.py', 'build_descriptive_reports.py', 'eda_diagnostics.py', 'airbnb_deep_dive.py']]
+            ['__init__.py', 'build_descriptive_reports.py', 'eda_diagnostics.py', 'airbnb_deep_dive.py', 'airbnb_report_presentation.py']]
 required += [PROJECT_ROOT / 'data' / 'raw' / 'AIRBNB' / name for name in
              ['train_users_2.csv', 'test_users.csv', 'sessions.csv', 'countries.csv', 'age_gender_bkts.csv']]
 missing = [str(p.relative_to(PROJECT_ROOT)) for p in required if not p.is_file()]
@@ -1064,6 +1055,9 @@ def main():
         path.parent.mkdir(parents=True,exist_ok=True)
         nbformat.write(nb,path)
         print(f"Saved {dataset} notebook: {path}",flush=True)
+        if dataset == "AIRBNB":
+            from scripts.airbnb_report_presentation import verify_artifacts
+            verify_artifacts(root, nb)
     if all((root/"reports"/d/"analysis_metadata.json").exists() for d in ["HOTEL","AIRBNB","EXPEDIA"]):
         write_summary(root)
         print("Updated reports/README.md",flush=True)

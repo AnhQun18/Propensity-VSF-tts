@@ -13,7 +13,7 @@
     "sessions_missing_ids": 34496,
     "figure_seed": 42,
     "rules_checked_on": "2026-11-01",
-    "download_date_status": "not_recorded_confirmed_by_provider_2026-11-02",
+    "download_date_status": "unknown_no_documentary_evidence",
     "dataset_version_status": "unknown_kaggle_version_local_snapshot_identified",
     "local_snapshot_sha256": "45e506f76002c40e6710fe27864a365bd0476ceae98e4e2803d7bd239c01114c",
     "valid_booking_lags": 88879,
@@ -31,12 +31,285 @@
     "primary_target": "observed_first_booking_in_source_labels_not_fixed_horizon",
     "proposed_deployment_horizon_days": 90,
     "fixed_horizon_negative_followup_verified": false,
-    "analysis_revision": "airbnb_readability_and_terminology_v3"
+    "analysis_revision": "airbnb_completion_stages_0_to_4",
+    "statistical_fingerprint": "d3628130e43038bd43c54f51bb9bd9ae991a7d7421dd2c9d02b10eca4d631afa",
+    "group_rate_figure_cohort": "2014",
+    "columns_with_usage_decision": 34,
+    "completion_stage": 4
   },
   "analysis_date": "2026-11-02",
-  "script_sha256": "f8117ddac28222e9b054107e92051d7336117feed8036ef0ea6c43099c67f2d3",
+  "script_sha256": "d61f7b81b6feee6da8477ed3dba55625be5346281348f0e783e8fb08505ab675",
   "diagnostics_script_sha256": "0299ef56588c706e42959cf6180174faffb11ef801fd9e336750c0171b9dea86",
-  "airbnb_deep_dive_script_sha256": "c1dde8ec10a5a9915341dec9b2cab68ba67699c440ae62619ad4833fe9263c00",
+  "airbnb_deep_dive_script_sha256": "2a64165923cb92e5727a9f56ade846222f3f6bec3e94c1be86a3e2177aa8238a",
+  "presentation_script_sha256": "40978ca06f4eebf7109249041e125cfc4fe2f2f11d2a37bd911aad7854776bb4",
+  "completed_stages": [
+    {
+      "stage": 0,
+      "executed_cells": 13,
+      "statistical_fingerprint": "d3628130e43038bd43c54f51bb9bd9ae991a7d7421dd2c9d02b10eca4d631afa",
+      "checks": "numeric facts, evidence, captions, notebook outputs, source hashes, decimals"
+    },
+    {
+      "stage": 1,
+      "executed_cells": 13,
+      "statistical_fingerprint": "d3628130e43038bd43c54f51bb9bd9ae991a7d7421dd2c9d02b10eca4d631afa",
+      "checks": "numeric facts, evidence, captions, notebook outputs, source hashes, decimals"
+    },
+    {
+      "stage": 2,
+      "executed_cells": 13,
+      "statistical_fingerprint": "d3628130e43038bd43c54f51bb9bd9ae991a7d7421dd2c9d02b10eca4d631afa",
+      "checks": "numeric facts, evidence, captions, notebook outputs, source hashes, decimals"
+    },
+    {
+      "stage": 3,
+      "executed_cells": 12,
+      "statistical_fingerprint": "d3628130e43038bd43c54f51bb9bd9ae991a7d7421dd2c9d02b10eca4d631afa",
+      "checks": "numeric facts, evidence, captions, notebook outputs, source hashes, decimals"
+    },
+    {
+      "stage": 4,
+      "executed_cells": 12,
+      "statistical_fingerprint": "d3628130e43038bd43c54f51bb9bd9ae991a7d7421dd2c9d02b10eca4d631afa",
+      "checks": "numeric facts, evidence, captions, notebook outputs, source hashes, decimals, executive number provenance, column decisions, merged limitations, timeline"
+    }
+  ],
+  "executive_evidence": [
+    {
+      "Ý trong tóm tắt": "Phát hiện 1",
+      "Bảng hoặc câu hỏi nguồn": "B1",
+      "Số liệu và nội dung được đối chiếu": "Quy mô train, test, số và tỷ lệ nhãn y=1",
+      "Đường dẫn dữ liệu hoặc cách tính": "facts.rows; facts.test_rows; facts.positive; facts.rate"
+    },
+    {
+      "Ý trong tóm tắt": "Phát hiện 2",
+      "Bảng hoặc câu hỏi nguồn": "B2; B6",
+      "Số liệu và nội dung được đối chiếu": "88,879 độ trễ hợp lệ; thời hạn và mức bao phủ 30/60/90 ngày",
+      "Đường dẫn dữ liệu hoặc cách tính": "facts.valid_booking_lags; facts.booking_coverage_30/60/90_pct"
+    },
+    {
+      "Ý trong tóm tắt": "Phát hiện 3",
+      "Bảng hoặc câu hỏi nguồn": "B3",
+      "Số liệu và nội dung được đối chiếu": "V của giới tính và ứng dụng đăng ký, toàn kỳ và năm 2014",
+      "Đường dẫn dữ liệu hoặc cách tính": "association: gender/signup_app × effect_all/effect_2014"
+    },
+    {
+      "Ý trong tóm tắt": "Phát hiện 4",
+      "Bảng hoặc câu hỏi nguồn": "B4",
+      "Số liệu và nội dung được đối chiếu": "Tỷ lệ thiếu tuổi, V cờ thiếu tuổi và rank-biserial tuổi 16–100",
+      "Đường dẫn dữ liệu hoặc cách tính": "missing tuổi từ train; association: hai dòng tuổi × effect_2014"
+    },
+    {
+      "Ý trong tóm tắt": "Phát hiện 5",
+      "Bảng hoặc câu hỏi nguồn": "B5",
+      "Số liệu và nội dung được đối chiếu": "Độ phủ, chênh độ phủ, tỷ lệ đặt chỗ có/thiếu nhật ký; quy mô train 2014",
+      "Đường dẫn dữ liệu hoặc cách tính": "facts.train_2014_users; facts.train_2014_session_coverage_pct; sessions_2014"
+    },
+    {
+      "Ý trong tóm tắt": "Việc cần giải quyết 1",
+      "Bảng hoặc câu hỏi nguồn": "B6; B2; Q3",
+      "Số liệu và nội dung được đối chiếu": "29 ngoại lệ, độ trễ lớn nhất 365 ngày và phương án 90 ngày",
+      "Đường dẫn dữ liệu hoặc cách tính": "facts.negative_booking_lags; facts.max_observed_booking_lag_days; facts.proposed_deployment_horizon_days"
+    },
+    {
+      "Ý trong tóm tắt": "Việc cần giải quyết 2",
+      "Bảng hoặc câu hỏi nguồn": "B8; Q1",
+      "Số liệu và nội dung được đối chiếu": "Mức khớp 100% và điều kiện thông tin tại t0",
+      "Đường dẫn dữ liệu hoặc cách tính": "Tính trực tiếp từ ngày đặt chỗ có giá trị và nhãn y"
+    },
+    {
+      "Ý trong tóm tắt": "Việc cần giải quyết 3",
+      "Bảng hoặc câu hỏi nguồn": "B7",
+      "Số liệu và nội dung được đối chiếu": "Hiệu chỉnh tháng 4/2014 và đánh giá tháng 5–6/2014",
+      "Đường dẫn dữ liệu hoặc cách tính": "protocol: account_from/account_to; đây là đề xuất, chưa chia tập"
+    }
+  ],
+  "executive_numeric_checks": [
+    {
+      "sources": [
+        "B1"
+      ],
+      "displayed_numbers": [
+        "213451",
+        "41.65",
+        "62096",
+        "88908"
+      ],
+      "all_matched": true
+    },
+    {
+      "sources": [
+        "B2",
+        "B6"
+      ],
+      "displayed_numbers": [
+        "3E+1",
+        "6E+1",
+        "75.33",
+        "80.26",
+        "83.29",
+        "88879",
+        "9E+1"
+      ],
+      "all_matched": true
+    },
+    {
+      "sources": [
+        "B3"
+      ],
+      "displayed_numbers": [
+        "0.109",
+        "0.207",
+        "0.251",
+        "2014"
+      ],
+      "all_matched": true
+    },
+    {
+      "sources": [
+        "B4"
+      ],
+      "displayed_numbers": [
+        "-0.005",
+        "0.374",
+        "16",
+        "1E+2",
+        "2014",
+        "41.22"
+      ],
+      "all_matched": true
+    },
+    {
+      "sources": [
+        "B5"
+      ],
+      "displayed_numbers": [
+        "17.54",
+        "2.78",
+        "2014",
+        "38.98",
+        "76466",
+        "96.53",
+        "99.31"
+      ],
+      "all_matched": true
+    },
+    {
+      "sources": [
+        "B6",
+        "B2"
+      ],
+      "displayed_numbers": [
+        "29",
+        "365",
+        "9E+1"
+      ],
+      "all_matched": true
+    },
+    {
+      "sources": [
+        "B8"
+      ],
+      "displayed_numbers": [
+        "1E+2"
+      ],
+      "all_matched": true
+    },
+    {
+      "sources": [
+        "B7"
+      ],
+      "displayed_numbers": [
+        "2014",
+        "4",
+        "5",
+        "6"
+      ],
+      "all_matched": true
+    }
+  ],
+  "rendered_tables_sha256": [
+    "02db4fa2da5ae573a6b3c04e5cbafbd954c82a8a5f9dbf4a1b37dba1cbd70640",
+    "04cde1a2348320ccbe5f6febaf9f9011593869bf2918a5f3cc0c0c5709d35324",
+    "0748e4e2243c0de1f336cd44a795512a69c4efcf527d5ad633ebd96018a7ce83",
+    "127e0b5a6a82ec7e2996b30bbad95973a93bf3d4b8649819f94749f563937b97",
+    "1795306454dd4eabd3a23a9444e0d7a8f8d761d1e4fa3ca4133e722bbf87cf48",
+    "1976e2caf37775b0478829e3a9bc2107d165292d603c27f5c8ae31c62e47dbb8",
+    "1b49df75f9db924f73ba2af6c1a173a464336a3d3608d82908aa77c56fd9b224",
+    "1ca4daf65364dce93a8db21294d77281fde1a1e76026fcf62ceb2c40b8b7f576",
+    "1e4622b05a518ed60e8270e8a1f02b8194ce2b472baf9264b3427735b0e30112",
+    "1faebde018b7b91b7ff8afac94d9b7956a3c88cc1eef632983494c290e2a37ad",
+    "233ffa9a423853664bfeab87ffc9a0b2bb689f770daa40c7b5c4df38d90ffa86",
+    "2b7bb19115db1d0eff143799241a1f6c7447661f609c904575619c6ed068e309",
+    "309d57d871d9ae10b312dda0375f69d540eb227ed4ff2fde06652942882b3baa",
+    "311101311cacf98788730b2167ac18cd816f3d48e517c7e2c0b112b0eae9d57d",
+    "36ffac24efe1ce67bea9eff4e8125bdcafc6b5dea44b1f3f72f2b17df8899057",
+    "39c83ba09d9f3d5a512d18b91f79ce88b38de603d3b07123da19e3e612d90610",
+    "3c063d7fd052426eed81906c2617275cf2766ce236280ec244d007a12688ec03",
+    "3cce3097ab2c6790a56c1737b2900a1f4e975f4ad5dc3ac5f47f07140a573c53",
+    "3e4e0be2355fb12011c17300e4a17ac7df80eed4d7ef720397b40657aad8a590",
+    "4117032ab9bc3bbebdaf942e6f2e0c0c1b0992ed6bef946dbe40a5f2c8c02828",
+    "428d47afcf805d332fcd487552bf47680878fdfa8f3ea4c3856882cbd6baa34c",
+    "4439fd3d64770289ed23751dfbe7bead2bcb66f7931f16cbd5c83da006d76336",
+    "44f5193708c21ec6e7748920ddea0c88b9ac6687e0cf63a6f201feaa71abaff0",
+    "4582c6a6ad9325c385ac8dbb13f707731a174e7e4fde5807325c9006c4525484",
+    "472b906eb109ac125c9ff9c89db0b76a3e0b818a47a8322b472c1374d81fa5cc",
+    "4af7e0e76d47035863d8d6a2476c8cef0b07085b5c8c8a2245386a89da7a18f1",
+    "4b0bd9f9f30111137cc7e781f2aa1d93e952c4e5dccebe1dea3645548542d79d",
+    "507d48fca92d5e18842807012d303decd84c94c507bc789acf8042af7ab60669",
+    "517714409030bfcfacaca5d18072dce01528c6dc6c6f66c88202cd951a2fed42",
+    "55af9643a3128cfa7faf0ff2cef7ec7b011c9169c8cf9d35ac26bf36fd3ab552",
+    "5759c4618218046b6f1ec8d6da5411eb5c689267d6f27b6422fc32651a4a7aff",
+    "59221ad04658c9c82df938f45e90032e492f6d69620dd06696286307226b79ba",
+    "59987c1fe7fc644bc59ac46ae9baf3a3e9f684141ef0a8bfd591037d04fc5dd0",
+    "5e8d9ce4d7344d6176dfdac28bbc946fe0f2d555d0550bbf43a72c67c139f043",
+    "5f836d961d2ce6d8608f542529069a2c76541330b6e12dd684bf4523673a7424",
+    "68d4f2ae8ac3c0ebcb4d24f875d90311eebb40e8ea7d2339f3b955f5252187c5",
+    "6a1b2f69dafb7dc32ac1bd0c0dc317add3e56d7a314a81110ac14fa846943a19",
+    "70b56e403dba41d4fffadfe62c8252d167faa1d9df7e255c709c6c0a3fe79d19",
+    "7298999721fea2b3378cc36396251f49324cd7d17241138ecfa260de63f80445",
+    "7bb06c49d398edc13d31872ad1824e717277baf95ff11b7e621323b5b48f70d8",
+    "8162419eba3e637f0b6e8df62b006e47b1375e196f3981dbee1f4029b797b47c",
+    "86f74826af771d8c25e0f4e1fc4ed9f730f25e03bcf4409959ca61c8bdf5f911",
+    "93f65eeb033f95699e175bad377b0f76cb49158f1a018906d4c280eb1610dd0b",
+    "94d6457cfe0de1dd34a8fe5e14b7998c972c1f9d94013611dc92656ede732157",
+    "99f3cb51defedd0a34035e1050b7697a088886ad28137eaa9816ec1ad9a18afd",
+    "9c707a7f8e5e55a2df235c184955284bc5d9756c0ed00831a9c208035a284d0b",
+    "9d590fcf5977e72b0cef89c207704fa1352f5d70416320d925df9558893b9be1",
+    "9d6f11c613b310bdab5986d477048c92655bcf50fd8c2ef48c908e61f313b4a0",
+    "9f48f8385ff35fb11f593a794e45419449f849f31b58520ebf49dd30695b118b",
+    "a2ec795859ade1890e38acddced0fc3b41d123026703b459db4136abf0a0422e",
+    "a31d5cd316a43dd7b004d3a39dcb8e621de073c62a324f74c5dc9c28ba9434bc",
+    "a567ae780b2f347d997ed3c199651c3dd67dcddf740ef8f0864f49cfe0182717",
+    "a5c13a8b9c83be66a97dcc975c3d5bde1568b082709575e684b64cdf19a84b9a",
+    "a7771e071a660c1db5dd5e2c908567e359127d9befd4be57105ecabcce65069a",
+    "a89ddf01a8ecc55a386ab4a30215759f205ac844af8fa450b05036952fa57342",
+    "aa223f77f07f8a7411d347f736ebe82bc75ee468373fbf7dac784a272e05e273",
+    "aee6efdec6f18fe41d8e4ea9d8c3cbb1102029f9ac6b25bdff097bd734356cd1",
+    "b2579bb92f68555c89f5c67efe7dbe2e97d191451e81585321ffc30f228bc0a1",
+    "b505614a8a0f1ffb676a572cebf43562d614c7603118f11ed76147c07e0ef036",
+    "b9f1b1a2c51543a7996ec9f41215dc5af7b789a3d747c71c860252b2a02886d4",
+    "ba3d1bdcb1dcfdd886f05e55c6153acfdfa3918152b6f5e4d60d53f46d4bb5a9",
+    "bd520ad6bf70f353e044c56646c612fa9ea26941ce8efcb6824b494066078a16",
+    "c476b33e457f339ca09ab17fae60eb2541854eddb6a03b002be3ed58ec30d73f",
+    "c67604b9a86c050a179d00e395a992928fe84c562149176e5509ef17699b337b",
+    "c86792d291dd7f430987bc1ded9a8ef3fc4589aed43e9c8c1fc26131b6d270bf",
+    "c9b7120d8e7662879a69ca6c83687b65c3ee2b75ad1ecaa3c79b4277d8b68d39",
+    "cf4e603cb115e405438004015e18dfb48480d227555d3412b53cccb6ba8bc4e8",
+    "d3df1aaa8318763a09caaa7e1a814abe194ac2ba0e2fc827fce0a88c9dafdbfc",
+    "d4da9add72a415a25a03255efceb32a9ffff458724d793f7522670207802314d",
+    "d8b082e7ca2c2b96c5ba188d8b24c9f67fe0ee151e2a659a4adac78daf0526cc",
+    "e36e1a17c16360fec0bad32f8f3cc0140eb514dbd3896a4b16e0d5300a263d59",
+    "e7ae2107f126739d16676851fe72fa87fd0d81604d0c98ceff115fccc6a028ee",
+    "eb6cc89a283a2eb50534062280a8ac0b6ad04eba43b7a00d630d7843f7a3e3a3",
+    "ec023b9a12afcd2cffaf6f0db9ad69e6044da822e4d0185c11b462104611aa54",
+    "ed45b1e32c9a44e0ac6127f3ba6d7322177d76367499ffd4107385f53b023447",
+    "f214ff459a73cf79ac2040e05187694eb075d228bdb69a766257052157096bee",
+    "f4b4f23e6e1128447baa0fdbfac175a2aab04a9d861ef7b924ed7ca8d1b7dd17",
+    "f5cea149e16f3c7a09510f444b17c9d64591632921c5e04abcf437d60dd83162",
+    "f6b256be22fb0d8b6e791653ae9d9d4563f108b6667c5c5eefb09350225ac266",
+    "ff4ad2cc7a1745d6321fb07272df6a658bda4989476ae4b9846b37945b56d475"
+  ],
   "environment": {
     "Python": "3.14.2",
     "pandas": "2.3.3",
@@ -58,22 +331,25 @@
     "multivariate_main",
     "risks",
     "research_design",
-    "conclusion_main",
     "appendix",
     "reproducibility"
   ],
   "download_date": "not_recorded",
-  "download_date_note": "Người cung cấp xác nhận không lưu ngày tải hoặc mã phiên bản Kaggle, 2026-11-02; định danh bản local bằng SHA-256.",
+  "download_date_note": "Chưa có bằng chứng trong hồ sơ dự án về ngày tải hoặc mã phiên bản Kaggle. Bản dữ liệu được nhận diện bằng SHA-256.",
   "figure_seed": 42,
   "figure_notes": {
-    "missing_patterns.png": "Nhận xét: date_first_booking thiếu 58.35% trong toàn bộ users train AIRBNB; chênh lệch missing lớn nhất giữa các nhóm account year là 27.21 điểm phần trăm ở first_affiliate_tracked. Ô xanh là NA. Mẫu dòng hiển thị dùng seed=42; việc sắp theo pattern chỉ để nhìn cụm thiếu, không phải thứ tự thời gian. Các khác biệt này không đủ kết luận cơ chế MCAR/MAR/MNAR.",
-    "outliers_and_target.png": "Nhận xét: theo hàng rào Q1−1,5×IQR và Q3+1,5×IQR, age có 5,594/125,461 giá trị bị gắn cờ (4.46%) trong toàn bộ users train AIRBNB; đây là bất thường thống kê, chưa phải lỗi nhập liệu. Median age theo nhãn: 0=34.00, 1=33.00. Boxplot bên phải ẩn các điểm ngoài whisker để đọc vùng giữa, không xóa chúng khỏi bảng hay raw. Đơn vị xem từ điển; IQR=0 ở biến rời rạc có thể gắn cờ nhiều giá trị thật. Trục x boxplot raw dùng symlog; hàng rào IQR vẫn tính trên giá trị raw, không phải log.",
-    "categories_and_target.png": "Nhận xét: signup_app có 4 nhóm (không có NA); 0 nhóm dưới 100 quan sát. Nhóm lớn nhất Web có 182,717 quan sát, tỷ lệ nhãn 1 là 43.80%. Hai trục trả lời số lượng nhóm và tỷ lệ bên trong nhóm, không dùng lẫn mẫu số; phân tầng cohort được trình bày tại phần đa biến.",
-    "multivariate.png": "Nhận xét: với người dùng Web năm 2014, nhóm direct có tỷ lệ đặt chỗ 45.18% (n=33,354). Nhóm content có tỷ lệ 11.08% (n=1,642). Trong nhóm FEMALE cùng năm, tỷ lệ của người có tuổi là 51.74%, so với 32.41% ở người thiếu tuổi. Các chênh lệch trong cùng năm là cơ sở để kiểm tra giá trị của những nhóm kết hợp khi huấn luyện. Dấu * đánh dấu ô có n<100.",
-    "users_distributions.png": "Nhận xét: NDF chiếm 58.35% toàn users; age thiếu 41.22% và có 2,410 giá trị ngoài dải tham chiếu 16–100. Histogram chỉ vẽ tuổi 16–100, không thay đổi raw hoặc khẳng định mọi tuổi ngoài dải đều sai.",
-    "session_coverage.png": "Nhận xét: độ phủ sessions trên toàn bộ train là 34,58%. Khi giới hạn ở nhóm đăng ký năm 2014, độ phủ train đạt 96.53%, gần hơn với mức 99.31% của test. Khoảng cách còn 2.78 điểm phần trăm. Nhóm đăng ký năm 2010–2013 không có nhật ký, nên tỷ lệ toàn kỳ chịu ảnh hưởng lớn của phạm vi thu thập.",
-    "account_cohorts.png": "Nhận xét: nhóm đăng ký tháng 2010-01 chỉ có 61 người. Tỷ lệ đặt chỗ là 52.46% với khoảng Wilson 95% từ 40.16% đến 64.47%. Vì cỡ mẫu nhỏ, ước lượng của tháng này có độ bất định lớn. Vạch đứt tháng 1/2014 đánh dấu thời kỳ bắt đầu có sessions.",
-    "booking_delay.png": "Nhận xét: trong 88,879 lượt đặt chỗ có độ trễ không âm, 75.33% xảy ra trong 30 ngày, 80.26% trong 60 ngày và 83.29% trong 90 ngày. Phần tăng thêm từ ngày 30 đến ngày 90 cho thấy lợi ích về mức bao phủ khi kéo dài thời hạn. Mẫu số chỉ gồm các lượt đặt chỗ có độ trễ hợp lệ. Bảng ngoại lệ thống kê riêng 29 trường hợp độ trễ âm.",
-    "cohort_strata.png": "Nhận xét: trong năm 2014, tỷ lệ đặt chỗ của Web là 42.53%, iOS là 25.23% và Android là 21.85%. Chênh lệch giữa các ứng dụng vẫn xuất hiện khi so sánh trong cùng năm. Nhóm FEMALE có tỷ lệ 50.84%, so với 26.54% ở nhóm giới tính unknown. Nhóm OTHER chỉ có 72 người nên cần đọc cùng khoảng Wilson trong phụ lục. Dấu * đánh dấu ô có n<100."
+    "missing_patterns.png": "**Quan sát:** date_first_booking thiếu 58.35% trong toàn bộ users train AIRBNB; chênh lệch missing lớn nhất giữa các nhóm account year là 27.21 điểm phần trăm ở first_affiliate_tracked. Ô xanh là NA. Mẫu dòng hiển thị dùng seed=42; việc sắp theo pattern chỉ để nhìn cụm thiếu, không phải thứ tự thời gian. Các khác biệt này không đủ kết luận cơ chế MCAR/MAR/MNAR.\n\n**Phạm vi và cách đọc:** Bảng tỷ lệ dùng toàn bộ train; hình mẫu thiếu chỉ hiển thị tối đa 300 dòng, seed=42.",
+    "outliers_and_target.png": "**Quan sát:** theo hàng rào Q1−1.5×IQR và Q3+1.5×IQR, age có 5,594/125,461 giá trị bị gắn cờ (4.46%) trong toàn bộ users train AIRBNB; đây là bất thường thống kê, chưa phải lỗi nhập liệu. Median age theo nhãn: 0=34.00, 1=33.00. Boxplot bên phải ẩn các điểm ngoài whisker để đọc vùng giữa, không xóa chúng khỏi bảng hay raw. Đơn vị xem từ điển; IQR=0 ở biến rời rạc có thể gắn cờ nhiều giá trị thật. Trục x boxplot raw dùng symlog; hàng rào IQR vẫn tính trên giá trị raw, không phải log.\n\n**Phạm vi và cách đọc:** Tuổi không thiếu trong train. Dải ngoại lai là quy tắc mô tả; dữ liệu gốc được giữ nguyên.",
+    "categories_and_target.png": "**Quan sát:** signup_app có 4 nhóm (không có NA); 0 nhóm dưới 100 quan sát. Nhóm lớn nhất Web có 182,717 quan sát, tỷ lệ nhãn 1 là 43.80%. Hai trục trả lời số lượng nhóm và tỷ lệ bên trong nhóm, không dùng lẫn mẫu số; phân tầng nhóm đăng ký được trình bày tại phần đa biến.\n\n**Phạm vi và cách đọc:** Toàn bộ người dùng train. Số lượng dùng mẫu số toàn tập; tỷ lệ dùng mẫu số từng ứng dụng.",
+    "multivariate.png": "**Quan sát:** với người dùng Web năm 2014, nhóm direct có tỷ lệ đặt chỗ 45.18% (n=33,354). Nhóm content có tỷ lệ 11.08% (n=1,642). Trong nhóm FEMALE cùng năm, tỷ lệ của người có tuổi là 51.74%, so với 32.41% ở người thiếu tuổi. Các chênh lệch trong cùng năm là cơ sở để kiểm tra giá trị của những nhóm kết hợp khi huấn luyện. Dấu * đánh dấu ô có n<100.\n\n**Phạm vi và cách đọc:** Người đăng ký năm 2014. Mẫu số là người trong từng ô kết hợp; dấu * là n<100.",
+    "users_distributions.png": "**Quan sát:** NDF chiếm 58.35% toàn users; age thiếu 41.22% và có 2,410 giá trị ngoài dải tham chiếu 16–100. Histogram chỉ vẽ tuổi 16–100, không thay đổi raw hoặc khẳng định mọi tuổi ngoài dải đều sai.\n\n**Phạm vi và cách đọc:** Toàn bộ người dùng train. Biểu đồ tuổi giới hạn hiển thị 16–100; bảng chi tiết giữ tuổi thiếu và ngoài dải.",
+    "session_coverage.png": "**Quan sát:** độ phủ sessions trên toàn bộ train là 34.58%. Khi giới hạn ở nhóm đăng ký năm 2014, độ phủ train đạt 96.53%, gần hơn với mức 99.31% của test. Khoảng cách còn 2.78 điểm phần trăm. Nhóm đăng ký năm 2010–2013 không có nhật ký, nên tỷ lệ toàn kỳ chịu ảnh hưởng lớn của phạm vi thu thập.\n\n**Phạm vi và cách đọc:** Người dùng trong từng tập và năm đăng ký. Có nhật ký chưa xác định nhật ký có trước t0.",
+    "account_cohorts.png": "**Quan sát:** nhóm đăng ký tháng 2010-01 chỉ có 61 người. Tỷ lệ đặt chỗ là 52.46% với khoảng Wilson 95% từ 40.16% đến 64.47%. Vì cỡ mẫu nhỏ, ước lượng của tháng này có độ bất định lớn. Vạch đứt tháng 1/2014 đánh dấu thời kỳ bắt đầu có sessions.\n\n**Phạm vi và cách đọc:** Người dùng train theo tháng đăng ký. Khoảng Wilson 95% giả định người dùng độc lập.",
+    "booking_delay.png": "**Quan sát:** trong 88,879 lượt đặt chỗ có độ trễ không âm, 75.33% xảy ra trong 30 ngày, 80.26% trong 60 ngày và 83.29% trong 90 ngày. Phần tăng thêm từ ngày 30 đến ngày 90 cho thấy lợi ích về mức bao phủ khi kéo dài thời hạn. Mẫu số chỉ gồm các lượt đặt chỗ có độ trễ hợp lệ. Bảng ngoại lệ thống kê riêng 29 trường hợp độ trễ âm.\n\n**Phạm vi và cách đọc:** Người đã đặt chỗ và có độ trễ không âm. Các tỷ lệ không đại diện cho toàn bộ người dùng.",
+    "cohort_strata.png": "**Quan sát:** trong năm 2014, tỷ lệ đặt chỗ của Web là 42.53%, iOS là 25.23% và Android là 21.85%. Chênh lệch giữa các ứng dụng vẫn xuất hiện khi so sánh trong cùng năm. Nhóm FEMALE có tỷ lệ 50.84%, so với 26.54% ở nhóm giới tính unknown. Nhóm OTHER chỉ có 72 người nên cần đọc cùng khoảng Wilson trong phụ lục. Dấu * đánh dấu ô có n<100.\n\n**Phạm vi và cách đọc:** Người dùng train, tách theo năm đăng ký. Ô có n<100 được đánh dấu; khoảng Wilson ở phụ lục.",
+    "association_strength.png": "**Quan sát:** tình trạng thiếu tuổi có V lớn nhất trong các biến phân loại được khảo sát. Liên hệ của các mốc theo tháng giảm khi chỉ xét năm 2014. Tuổi trong dải 16–100 có rank-biserial=-0.005 trong năm 2014, gần 0.\n\n**Phạm vi và cách đọc:** V tính trên toàn bộ người dùng trong từng phạm vi, gồm giá trị thiếu như một nhóm. Rank-biserial chỉ tính trên tuổi 16–100 và được đặt trên trục riêng. Hai thước đo không dùng chung ngưỡng so sánh. Liên hệ của cờ thiếu cần được kiểm tra về thời điểm có sẵn tại t0.",
+    "group_rates_wilson.png": "**Quan sát:** đường đứt đánh dấu tỷ lệ chung 38.24% của người đăng ký năm 2014. Khoảng rộng ở các nhóm ít người cho thấy tỷ lệ ước lượng kém chính xác hơn.\n\n**Phạm vi và cách đọc:** mẫu số của mỗi điểm là số người trong nhóm, được ghi cạnh tên. Khoảng Wilson 95% giả định người dùng độc lập. Mức chồng lấp khoảng tin cậy không thay thế kiểm định chênh lệch. Tuổi và tình trạng thiếu tuổi chỉ là ứng viên đầu vào sau khi xác minh tại t0.",
+    "table_relationships.png": "**Quan sát:** hồ sơ có thể ghép với nhật ký qua định danh. Có 34,496 sự kiện thiếu định danh nên không ghép được về người dùng.\n\n**Phạm vi và cách đọc:** mũi tên liền chỉ quan hệ khóa 1:nhiều. Mũi tên đứt chỉ quan hệ bối cảnh, chưa phải phép ghép được chấp nhận cho mô hình. Các con số là quy mô bảng, không phải số khách hàng bổ sung.",
+    "evaluation_timeline.png": "**Quan sát:** tập học mở rộng qua ba lượt kiểm định. Cấu hình được chọn trước khi huấn luyện lại đến hết tháng 3/2014. Tháng 4 dành cho hiệu chỉnh và tháng 5–6 dành cho đánh giá cuối.\n\n**Phạm vi và cách đọc:** các thanh biểu diễn khoảng ngày tạo tài khoản, không phải khoảng nhãn đã hoàn tất. Cỡ mẫu là số người quan sát trong cửa sổ, chưa phải số đủ điều kiện huấn luyện sau khi kiểm tra thời điểm có nhãn. Với mục tiêu 90 ngày, cần bổ sung điều kiện theo dõi đủ 90 ngày trước mỗi mốc dự đoán."
   }
 }
