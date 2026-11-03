@@ -1,4 +1,48 @@
-"""TỔNG HỢP HÀM EDA — HOTEL, AIRBNB, EXPEDIA.
+"""THƯ VIỆN EDA TÁI SỬ DỤNG + ADAPTER HOTEL, AIRBNB, EXPEDIA.
+
+DÙNG CHO BA BỘ DỮ LIỆU MỚI (không cần đổi mã nguồn):
+    from scripts.eda_all_datasets import dataframe_report
+    for name, frame in {"NEW_A": df_a, "NEW_B": df_b, "NEW_C": df_c}.items():
+        dataframe_report(frame, name, root=".")
+
+Có nhãn nhị phân, chọn cột và so sánh test:
+    dataframe_report(df_a, "NEW_A", ".", target="converted",
+                     numeric_columns=["income", "tenure"],
+                     categorical_columns=["channel"], group_columns=["channel"],
+                     meanings={"income": ("Thu nhập", "Xác minh đơn vị")}, test=df_a_test)
+Không truyền target nếu chưa có nhãn. Không tự tạo nhãn từ giả định nghiệp vụ.
+Nhãn thiếu bị loại khỏi mẫu số tỷ lệ; nhãn khác 0/1 cần được định nghĩa lại.
+Các cột số/phân loại tự nhận diện theo dtype nếu không chỉ định; hãy loại ID
+qua numeric_columns/categorical_columns. Hàm không thay thế dữ liệu gốc.
+
+Tự xây báo cáo cho dataset bất kỳ:
+    r = Report("NEW", "Báo cáo mới", root=".")
+    r.add("overview", "Tổng quan", "Mô tả quần thể...",
+          [("Thống kê", numeric_table(df, ["income"]))])
+    r.publish()                  # không gọi adapter ba bộ cũ
+    r.publish(prepare=my_hook)   # tùy chọn: my_hook(report)
+
+CHẠY CSV MỚI BẰNG JSON, ví dụ eda_config.json (tự đặt tên bộ và tên cột):
+    {"NEW_A": {"file": "train.csv", "target": "converted"},
+     "NEW_B": {"file": "observations.csv", "plots": false},
+     "NEW_C": {"file": "train.csv", "test_file": "test.csv"}}
+Đường dẫn tương đối nằm trong data/raw/<tên_bộ>/; cũng nhận đường dẫn tuyệt đối.
+    python scripts/eda_all_datasets.py --config eda_config.json
+    python scripts/eda_all_datasets.py --config eda_config.json --dataset NEW_A
+JSON nhận các tùy chọn của dataframe_report và read_csv_options (sep, encoding...).
+Entry point này đọc CSV vào RAM; với dữ liệu lớn, viết adapter đọc chunk và dùng
+TrainColumns(rows, numeric_columns, label_columns=["converted"]) hoặc
+label_columns=() khi không có nhãn. full_missing_diagnostics nhận label_column
+tùy chọn (None nếu không có nhãn); exact_spearman mặc định dùng numeric_columns.
+
+Đăng ký adapter riêng bằng register_report(name, builder), trong đó builder(root)
+trả về Report; chạy với build_report(name, root). Khi xuất notebook cho adapter
+Python riêng, truyền notebook_setup là đoạn mã đăng ký lại adapter sau khi nạp
+module dưới tên eda. register_csv_report tự lưu cấu hình vào notebook.
+
+Các hàm hotel_report/airbnb_report/expedia_report, enrich_*, deepen_*, risks,
+proposals, restructure và source_section vẫn dành cho schema ba bộ gốc.
+Chúng không nằm trong luồng dataframe_report cho bộ mới.
 
 File chứa phần triển khai của toàn bộ hàm/class trong 7 script phân tích
 hiện có, gồm đọc raw CSV, từ điển biến, chất lượng dữ liệu, thống kê mô tả,
@@ -354,7 +398,9 @@ def iqr_table(frame, columns, population):
     return pd.DataFrame(rows,columns=["column","population","nonnull_n","q1","q3","iqr","lower_fence","upper_fence","flagged_n","flagged_pct_nonnull","iqr_zero"])
 
 
-def missing_plot(report, data, columns, group, group_name, sample_note):
+def missing_plot(report, data, columns, group, group_name, sample_note, *, axis_labels=None):
+    """Plot missingness for any dataset; override titles/axes with axis_labels."""
+    axis_labels = axis_labels or {}
     chosen=[c for c in columns if c in data and data[c].isna().any()]
     rates=data[chosen].isna().mean().sort_values(ascending=False)
     chosen=list(rates.index[:12])
@@ -367,17 +413,17 @@ def missing_plot(report, data, columns, group, group_name, sample_note):
     axes[0].imshow(rows.to_numpy(dtype=int),aspect="auto",interpolation="nearest",cmap="Blues",vmin=0,vmax=1)
     axes[0].set(title=f"Missingness pattern: {len(rows)} displayed rows",ylabel="Descriptive row sample; sorted by pattern")
     axes[0].set_xticks(range(len(chosen)));axes[0].set_xticklabels(chosen,rotation=65,ha="right")
-    if report.dataset=="AIRBNB":
-        from matplotlib.patches import Patch
-        axes[0].set(title=f"Mẫu hình thiếu: {len(rows)} dòng hiển thị",xlabel="Cột dữ liệu",ylabel="Mẫu dòng, sắp theo mẫu hình thiếu")
-        axes[0].legend(handles=[Patch(facecolor=plt.get_cmap("Blues")(0),edgecolor="gray",label="Có giá trị"),Patch(facecolor=plt.get_cmap("Blues")(1.),label="Thiếu (NA)")],loc="upper left",bbox_to_anchor=(0,1.22),ncol=2,fontsize=8)
+    axes[0].set(title=axis_labels.get("pattern_title", f"Missingness pattern: {len(rows)} displayed rows"),
+                xlabel=axis_labels.get("xlabel", "Columns"),
+                ylabel=axis_labels.get("pattern_ylabel", "Display sample; sorted by pattern"))
     im=axes[1].imshow(grouped.to_numpy(),aspect="auto",vmin=0,vmax=100,cmap="Blues")
     axes[1].set(title=f"Missing by {group_name} (%)",ylabel=group_name)
     axes[1].set_yticks(range(len(grouped)));axes[1].set_yticklabels(grouped.index.astype(str))
     axes[1].set_xticks(range(len(chosen)));axes[1].set_xticklabels(chosen,rotation=65,ha="right")
-    if report.dataset=="AIRBNB":
-        axes[1].set(title="Tỷ lệ thiếu theo năm tạo tài khoản",xlabel="Cột dữ liệu",ylabel="Năm tạo tài khoản")
-    fig.colorbar(im,ax=axes[1],label="Thiếu (%)" if report.dataset=="AIRBNB" else "Missing (%)",fraction=.035,pad=.03);fig.tight_layout()
+    axes[1].set(title=axis_labels.get("group_title", f"Missing by {group_name} (%)"),
+                xlabel=axis_labels.get("xlabel", "Columns"),
+                ylabel=axis_labels.get("group_ylabel", group_name))
+    fig.colorbar(im,ax=axes[1],label=axis_labels.get("colorbar", "Missing (%)"),fraction=.035,pad=.03);fig.tight_layout()
     path=report.savefig("missing_patterns",fig)
     top=chosen[0]
     spread=grouped.max()-grouped.min();largest=spread.idxmax()
@@ -411,8 +457,10 @@ def correlation_scatter(report, data, cols, x, y, sample_name):
     return path,corr.reset_index(names="column"),note
 
 
-def category_panel(report, data, column, target, population):
-    table=data.groupby(column,dropna=False,observed=True)[target].agg(n="size",positive="sum").sort_values("n",ascending=False)
+def category_panel(report, data, column, target, population, *, axis_labels=None):
+    axis_labels = axis_labels or {}
+    validate_binary_target(data[target], target)
+    table=data.groupby(column,dropna=False,observed=True)[target].agg(n="count",positive="sum").sort_values("n",ascending=False)
     total=len(table);rare=table.n.lt(100)
     shown=table.head(8).copy();shown["positive_pct"]=shown.positive/shown.n*100
     fig,axes=plt.subplots(1,2,figsize=(12,4))
@@ -420,9 +468,10 @@ def category_panel(report, data, column, target, population):
     axes[0].bar(labels,shown.n,color=BLUE);axes[0].set(title=f"{column}: top groups",ylabel=f"{population} (count)")
     axes[1].bar(labels,shown.positive_pct,color=ORANGE);axes[1].set(title="Observed target rate within group",ylabel="Target = 1 (%)")
     for ax in axes: ax.tick_params(axis="x",rotation=35)
-    if report.dataset=="AIRBNB":
-        axes[0].set(title="Số người dùng theo ứng dụng đăng ký",xlabel=column,ylabel="Số người dùng train")
-        axes[1].set(title="Tỷ lệ booking trong từng ứng dụng",xlabel=column,ylabel="Có booking được ghi nhận (%)")
+    axes[0].set(title=axis_labels.get("count_title", f"{column}: top groups"),
+                xlabel=column, ylabel=axis_labels.get("count_ylabel", f"{population} (count)"))
+    axes[1].set(title=axis_labels.get("rate_title", "Observed target rate within group"),
+                xlabel=column, ylabel=axis_labels.get("rate_ylabel", f"{target} = 1 (%)"))
     fig.tight_layout();path=report.savefig("categories_and_target",fig)
     largest=shown.iloc[0];label=shown.index[0]
     na_note="bao gồm NA" if data[column].isna().any() else "không có NA"
@@ -431,23 +480,28 @@ def category_panel(report, data, column, target, population):
     return path,table.reset_index(),note
 
 
-def outlier_panel(report, frame, columns, target, population):
+def outlier_panel(report, frame, columns, target, population, *, units=None, axis_labels=None):
+    validate_binary_target(frame[target], target)
+    units = units or {}
+    axis_labels = axis_labels or {}
     stats=iqr_table(frame,columns,population)
     fig,axes=plt.subplots(1,2,figsize=(12,4))
     x=columns[0];y=columns[1] if len(columns)>1 else columns[0]
     axes[0].boxplot(frame[x].dropna(),showfliers=True,orientation="horizontal")
-    axes[0].set(xlabel=f"{x}\n({unit(x)})",title=f"{x}: raw boxplot",yticks=[])
+    axes[0].set(xlabel=f"{x}\n({units.get(x, 'đơn vị chưa cung cấp')})",title=f"{x}: raw boxplot",yticks=[])
     logarithmic=bool(frame[x].max()>20*max(float(frame[x].median()),1))
     if logarithmic: axes[0].set_xscale("symlog",linthresh=1)
     groups=[];labels=[]
     for value in sorted(frame[target].dropna().unique()):
         s=frame.loc[frame[target].eq(value),y].dropna()
         if len(s): groups.append(s);labels.append(str(value))
+    if not groups:
+        plt.close(fig)
+        raise ValueError("Outlier panel requires nonmissing numeric values with observed labels")
     axes[1].boxplot(groups,tick_labels=labels,showfliers=False)
-    axes[1].set(title=f"{y} by target; fliers hidden",xlabel=target,ylabel=f"{y}\n({unit(y)})")
-    if report.dataset=="AIRBNB":
-        axes[0].set(title="Tuổi raw: giữ toàn bộ giá trị ngoại lai",xlabel="Tuổi khai báo (năm; thang symlog)")
-        axes[1].set(title="Tuổi theo nhãn: ẩn điểm ngoài whisker",xlabel="Có booking được ghi nhận (0/1)",ylabel="Tuổi khai báo (năm)")
+    axes[1].set(title=f"{y} by target; fliers hidden",xlabel=target,ylabel=f"{y}\n({units.get(y, 'đơn vị chưa cung cấp')})")
+    axes[0].set(title=axis_labels.get("raw_title", f"{x}: raw boxplot"))
+    axes[1].set(title=axis_labels.get("group_title", f"{y} by {target}; fliers hidden"))
     fig.tight_layout();path=report.savefig("outliers_and_target",fig)
     row=stats.iloc[0]
     med=frame.groupby(target)[y].median()
@@ -725,9 +779,20 @@ def working_directory():
 class TrainColumns:
     """Context-managed, exact raw-column cache; bounded working RAM."""
 
-    def __init__(self, rows, numeric_columns):
+    def __init__(self, rows, numeric_columns, label_columns=("click_bool", "booking_bool")):
+        """Cache numeric columns and optional numeric labels, retaining NaN.
+
+        Set label_columns=() for unlabelled data, or pass your own column names.
+        The legacy defaults keep the existing Expedia entry point compatible.
+        """
         self.rows = int(rows)
+        if self.rows < 0:
+            raise ValueError("rows must be nonnegative")
         self.numeric_columns = list(numeric_columns)
+        self.label_columns = list(label_columns)
+        self.columns = list(dict.fromkeys(self.numeric_columns + self.label_columns))
+        if "_missing_bits" in self.columns:
+            raise ValueError("_missing_bits is reserved for the missingness cache")
         self.arrays = {}
         self.offset = 0
         self.schema = None
@@ -735,11 +800,10 @@ class TrainColumns:
 
     def __enter__(self):
         self.directory = self.temporary.__enter__()
-        for column in self.numeric_columns + ["click_bool", "booking_bool"]:
-            dtype = np.uint8 if column.endswith("_bool") else np.float64
+        for index, column in enumerate(self.columns):
             self.arrays[column] = np.lib.format.open_memmap(
-                self.directory / f"{column}.npy", mode="w+",
-                dtype=dtype, shape=(self.rows,),
+                self.directory / f"column_{index}.npy", mode="w+",
+                dtype=np.float64, shape=(self.rows,),
             )
         return self
 
@@ -751,12 +815,12 @@ class TrainColumns:
                 dtype=np.uint8, shape=(self.rows, math.ceil(len(self.schema) / 8)),
             )
         if list(chunk.columns) != self.schema:
-            raise ValueError("Expedia schema changed between CSV chunks")
+            raise ValueError("Schema changed between CSV chunks")
         end = self.offset + len(chunk)
         if end > self.rows:
             raise ValueError("CSV parser row count exceeds the raw-file inventory")
-        for column in self.numeric_columns + ["click_bool", "booking_bool"]:
-            self.arrays[column][self.offset:end] = chunk[column].to_numpy()
+        for column in self.columns:
+            self.arrays[column][self.offset:end] = chunk[column].to_numpy(dtype=np.float64, na_value=np.nan)
         self.arrays["_missing_bits"][self.offset:end] = np.packbits(
             chunk.isna().to_numpy(), axis=1, bitorder="little",
         )
@@ -797,7 +861,7 @@ def full_numeric_statistics(store, basic):
     return result
 
 
-def exact_spearman(store, columns=CORRELATION_COLUMNS):
+def exact_spearman(store, columns=None):
     """Rank each pair after its own NA removal, including average ranks for ties.
 
     Ranking the full columns once then dropping NA would produce the wrong
@@ -805,6 +869,9 @@ def exact_spearman(store, columns=CORRELATION_COLUMNS):
     """
     from scipy.stats import rankdata
 
+    if columns is None:
+        columns = getattr(store, "numeric_columns", [c for c in store.arrays if c != "_missing_bits"])
+    columns = list(columns)
     matrix = pd.DataFrame(np.nan, index=columns, columns=columns)
     pairs = []
     for i, a in enumerate(columns):
@@ -836,25 +903,39 @@ def exact_spearman(store, columns=CORRELATION_COLUMNS):
     ])
 
 
-def full_missing_diagnostics(report, train, seed=42):
+def full_missing_diagnostics(report, train, seed=42, *, label_column="booking_bool"):
     """All-row missing rates by label and exact binary-indicator correlations."""
     import matplotlib.pyplot as plt
 
     store = train["store"]
-    columns = list(train["missing"].sort_values(ascending=False).head(12).index)
+    if store.rows == 0:
+        raise ValueError("Missing diagnostics require at least one row")
+    label_values = ["ALL"] if label_column is None else [0, 1]
+    if label_column is not None:
+        labels = pd.Series(store.arrays[label_column], copy=False)
+        validate_binary_target(labels, label_column)
+        if labels.isna().any():
+            label_values.append("<MISSING>")
+    # The grouping label is represented by group counts (including NA), not
+    # duplicated as a feature column with the same name as the output index.
+    feature_missing = train["missing"].drop(labels=[label_column], errors="ignore")
+    columns = list(feature_missing.sort_values(ascending=False).head(12).index)
+    if not columns:
+        raise ValueError("Missing diagnostics require at least one column")
     positions = [store.schema.index(c) for c in columns]
-    groups = np.zeros((2, len(columns)), dtype=np.int64)
-    denominators = np.zeros(2, dtype=np.int64)
+    groups = np.zeros((len(label_values), len(columns)), dtype=np.int64)
+    denominators = np.zeros(len(label_values), dtype=np.int64)
     joint = np.zeros((len(columns), len(columns)), dtype=np.int64)
     for start in range(0, store.rows, 250_000):
         stop = min(start + 250_000, store.rows)
         mask = np.unpackbits(store.arrays["_missing_bits"][start:stop],
                              axis=1, count=len(store.schema), bitorder="little")[:, positions].astype(bool)
-        labels = store.arrays["booking_bool"][start:stop]
-        for label in [0, 1]:
-            selection = labels == label
-            denominators[label] += int(selection.sum())
-            groups[label] += mask[selection].sum(axis=0)
+        labels = store.arrays[label_column][start:stop] if label_column is not None else None
+        for index, label in enumerate(label_values):
+            selection = (np.ones(stop-start, dtype=bool) if label_column is None else
+                         np.isnan(labels) if label == "<MISSING>" else labels == label)
+            denominators[index] += int(selection.sum())
+            groups[index] += mask[selection].sum(axis=0)
         for i in range(len(columns)):
             for j in range(i, len(columns)):
                 joint[i, j] += np.count_nonzero(mask[:, i] & mask[:, j])
@@ -868,8 +949,9 @@ def full_missing_diagnostics(report, train, seed=42):
     divisor = np.sqrt(np.outer(variances, variances))
     correlation = np.divide(joint * float(store.rows) - np.outer(counts, counts),
                             divisor, out=np.full_like(divisor, np.nan), where=divisor != 0)
-    rates = pd.DataFrame(groups / denominators[:, None] * 100,
-                         index=pd.Index([0, 1], name="booking_bool"), columns=columns)
+    rates = pd.DataFrame(np.divide(groups * 100., denominators[:, None],
+                         out=np.full(groups.shape, np.nan), where=denominators[:, None] != 0),
+                         index=pd.Index(label_values, name=label_column or "population"), columns=columns)
     display_ids = np.random.default_rng(seed).choice(store.rows, min(300, store.rows), replace=False)
     display = pd.DataFrame(np.unpackbits(store.arrays["_missing_bits"][display_ids],
                            axis=1, count=len(store.schema), bitorder="little")[:, positions], columns=columns)
@@ -878,8 +960,8 @@ def full_missing_diagnostics(report, train, seed=42):
     axes[0].imshow(display, aspect="auto", interpolation="nearest", cmap="Blues", vmin=0, vmax=1)
     axes[0].set(title=f"Missingness: {len(display)} displayed train rows", ylabel="Display only; sorted by pattern")
     im = axes[1].imshow(rates, aspect="auto", vmin=0, vmax=100, cmap="Blues")
-    axes[1].set(title="Missing by booking: all train rows (%)", ylabel="booking_bool")
-    axes[1].set_yticks([0, 1], labels=["0", "1"])
+    axes[1].set(title=f"Missing by {label_column or 'population'}: all rows (%)", ylabel=label_column or "population")
+    axes[1].set_yticks(range(len(label_values)), labels=[str(v) for v in label_values])
     for ax in axes:
         ax.set_xticks(range(len(columns)), labels=columns, rotation=65, ha="right")
     fig.colorbar(im, ax=axes[1], label="Missing (%)", fraction=.035, pad=.03)
@@ -889,10 +971,10 @@ def full_missing_diagnostics(report, train, seed=42):
     largest = differences.idxmax()
     note = (
         f"Nhận xét: {columns[0]} thiếu {counts[0] / store.rows * 100:.2f}% trên toàn bộ train; "
-        f"chênh lệch missing lớn nhất giữa hai nhãn là {differences[largest]:.4f} điểm phần trăm "
+        f"chênh lệch missing lớn nhất giữa các nhóm là {differences[largest]:.4f} điểm phần trăm "
         f"ở {largest}. Bảng tỷ lệ, số đếm và tương quan cờ thiếu dùng đủ {store.rows:,} dòng. "
-        f"Chỉ hình pattern bên trái hiển thị 300 dòng, seed={seed}, sắp theo pattern, không theo thời gian. "
-        "Ô xanh là NA. Không suy cơ chế MCAR/MAR/MNAR từ hình; cờ thiếu gross booking vẫn tiết lộ kết quả."
+        f"Chỉ hình pattern bên trái hiển thị {len(display)} dòng, seed={seed}, sắp theo pattern, không theo thời gian. "
+        "Ô xanh là NA. Không suy cơ chế MCAR/MAR/MNAR từ hình; kiểm tra riêng nguy cơ rò rỉ nhãn của cờ thiếu."
     )
     report.figure_notes[path.name] = note
     count_table = pd.DataFrame(groups, index=rates.index, columns=columns).reset_index()
@@ -1618,6 +1700,7 @@ def airbnb_grouped_rates(frame, keys):
 
 
 def categorical_association(values, target):
+    validate_binary_target(target)
     values = values.astype("object").where(values.notna(), "<NA>").astype(str)
     table = pd.crosstab(values, target).reindex(columns=[0, 1], fill_value=0)
     n = int(table.to_numpy().sum())
@@ -3291,16 +3374,30 @@ def md_table(df):
 
 def wilson(successes, n):
     n = np.asarray(n, dtype=float)
-    p = np.asarray(successes, dtype=float) / n
+    successes = np.asarray(successes, dtype=float)
+    n, successes = np.broadcast_arrays(n, successes)
+    if ((n < 0) | (successes < 0) | (successes > n)).any():
+        raise ValueError("Wilson requires 0 <= successes <= n")
+    # An empty group has an undefined rate/interval, never a zero-rate estimate.
+    n = np.where(n > 0, n, np.nan)
+    p = successes / n
     z = 1.959963984540054
     center = (p + z*z/(2*n)) / (1 + z*z/n)
     half = z*np.sqrt(p*(1-p)/n + z*z/(4*n*n)) / (1 + z*z/n)
     return (center-half)*100, (center+half)*100
 
 
+def validate_binary_target(values, name="target"):
+    """Require numeric/bool 0/1 labels; NA is unlabelled, not a negative."""
+    if not values.dropna().isin([0, 1]).all():
+        raise ValueError(f"{name} must contain only 0/1 (or bool) and missing values")
+
+
 def rate_table(df, group, target, limit=None, ci=True):
+    """Binary positive rate per group, using only observed labels as denominator."""
+    validate_binary_target(df[target], target)
     key = df[group].astype("object").where(df[group].notna(), "<MISSING>")
-    out = df.groupby(key, observed=True, dropna=False)[target].agg(n="size", positive="sum")
+    out = df.groupby(key, observed=True, dropna=False)[target].agg(n="count", positive="sum")
     out = out.sort_values("n", ascending=False)
     out["rate_pct"] = out.positive / out.n * 100
     if ci:
@@ -3330,8 +3427,8 @@ def drift_table(train, test, cols):
     """Total variation, including missing; no fitted transformations."""
     rows = []
     for col in cols:
-        a = train[col].fillna("<MISSING>").astype(str).value_counts(normalize=True)
-        b = test[col].fillna("<MISSING>").astype(str).value_counts(normalize=True)
+        a = train[col].astype(object).where(train[col].notna(), "<MISSING>").astype(str).value_counts(normalize=True)
+        b = test[col].astype(object).where(test[col].notna(), "<MISSING>").astype(str).value_counts(normalize=True)
         idx = a.index.union(b.index)
         tv = (a.reindex(idx, fill_value=0)-b.reindex(idx, fill_value=0)).abs().sum()/2
         rows.append([col, tv, len(b.index.difference(a.index)), train[col].isna().mean()*100,
@@ -3340,12 +3437,27 @@ def drift_table(train, test, cols):
                                         "train_missing_pct", "test_missing_pct"]).sort_values("total_variation_0_1", ascending=False)
 
 
-def metadata_table(df, meanings):
+def metadata_table(df, meanings=None):
+    """Describe all columns; unspecified meaning/caution stays blank."""
+    meanings = meanings or {}
     return pd.DataFrame([[c, str(df[c].dtype), int(df[c].nunique(dropna=True)),
                           int(df[c].isna().sum()), df[c].isna().mean()*100,
-                          *meanings[c]] for c in df.columns],
+                          *meanings.get(c, ("", ""))] for c in df.columns],
                         columns=["column", "pandas_dtype", "distinct_nonnull", "missing_n",
                                  "missing_pct", "meaning", "role_or_caution"])
+
+
+def _json_default(value):
+    """Serialize numpy/pandas scalar facts without hiding unsupported objects."""
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, (pd.Timestamp, datetime)):
+        return value.isoformat()
+    if isinstance(value, Path):
+        return str(value)
+    if value is pd.NA or value is pd.NaT:
+        return None
+    raise TypeError(f"Not JSON serializable: {type(value).__name__}")
 
 
 @dataclass
@@ -3356,6 +3468,11 @@ class Report:
     sections: list = field(default_factory=list)
     facts: dict = field(default_factory=dict)
     figure_notes: dict = field(default_factory=dict)
+    prepare: object = None
+    metadata: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        self.root = Path(self.root)
 
     @property
     def directory(self):
@@ -3374,68 +3491,102 @@ class Report:
         plt.close(fig)
         return p
 
-    def publish(self):
-        environment = pd.DataFrame([["Python", platform.python_version()], ["pandas", pd.__version__],
-                                    ["numpy", np.__version__], ["matplotlib", matplotlib.__version__],
-                                    ["Phương pháp", "Thống kê mô tả, không mô hình"],
-                                    ["Chunk CSV lớn", str(CHUNK_SIZE)]], columns=["component", "value"])
-        if self.dataset == "AIRBNB":
-            import scipy
-            import nbformat
-            import IPython
-            environment = pd.concat([environment, pd.DataFrame(
-                [["scipy", scipy.__version__], ["nbformat", nbformat.__version__], ["IPython", IPython.__version__]],
-                columns=environment.columns)], ignore_index=True)
-        sampling_note = ("Expedia tính thống kê trên toàn bộ train, gồm quantile tuyến tính, skewness không chệch theo pandas và Spearman xếp hạng trung bình cho ties, loại NA theo từng cặp. Chỉ scatter (tối đa 4.000 điểm) và hình pattern missing (300 dòng) lấy mẫu hiển thị với numpy default_rng, seed=42; các bảng và heatmap tổng hợp dùng toàn bộ train. Cột raw được đệm tạm trên đĩa để giới hạn RAM và xóa sau khi xuất báo cáo; không tạo tập processed. Test chỉ là đối chiếu schema/chất lượng và các phân phối tổng hợp, không dùng tính thống kê train. " if self.dataset == "EXPEDIA" else "Hình lấy mẫu hiển thị dùng seed=42. ")
-        self.add("reproducibility", "Tái lập và kiểm soát phạm vi", "Chạy notebook theo thứ tự từ đầu, hoặc chạy `python scripts/eda_all_datasets.py --dataset " + self.dataset + "` tại thư mục gốc. Script chỉ đọc CSV raw, viết báo cáo/biểu đồ và lưu notebook trong notebooks/; không sửa raw, không ghi data/processed, không gọi pipeline huấn luyện. Các thời điểm phân tích dùng Asia/Ho_Chi_Minh. SHA-256 ở danh mục file nhận diện nguồn; số dòng theo CSV parser được đối chiếu với data_lines của file chính. Ngày tải raw chưa được ghi nhận; không suy từ mtime/ctime. " + sampling_note + "Script thực thi các cell bằng IPython trong cùng tiến trình và lưu output thật vào notebook; không khởi tạo kernel mạng. Phụ thuộc dựng báo cáo gồm pandas, numpy, scipy, matplotlib, nbformat và IPython; có thể mở notebook bằng Jupyter để Run All.", [("Môi trường thực thi", environment)])
-        if self.dataset == "AIRBNB":
-            pass  # Hàm đã được định nghĩa trong cùng file.
-            self.sections[-1] = reproducibility_section(self, environment)
-            prepare_publication = airbnb_prepare_publication
-            prepare_publication(self)
-        else:
-            prepare_publication = hotel_expedia_prepare_publication
-            prepare_publication(self)
+    def publish(self, prepare=None):
+        """Publish any dataset; an optional callback can prepare domain-specific sections.
+
+        No Hotel/Airbnb/Expedia schema is required. Use prepare(report) either
+        here or on the constructor; the per-call callback takes precedence.
+        """
+        hook = self.prepare if prepare is None else prepare
+        if hook is not None:
+            hook(self)
+        environment = {"Python": platform.python_version(), "pandas": pd.__version__,
+                       "numpy": np.__version__, "matplotlib": matplotlib.__version__}
+        if not any(s["key"] == "reproducibility" for s in self.sections):
+            self.add("reproducibility", "Tái lập và phạm vi",
+                     "Thống kê mô tả trên dữ liệu được cung cấp. Các giá trị thiếu không "
+                     "được thay thế; ngoại lai không bị xóa. Không tạo tập feature hoặc "
+                     "huấn luyện mô hình. Nhãn, đơn vị và thời điểm quan sát do người dùng xác định.",
+                     [("Môi trường", pd.DataFrame(environment.items(), columns=["component", "value"]))])
         parts = [f"# {self.title}",
-                 "> Phạm vi: EDA trên dữ liệu gốc. Không làm sạch/thay thế dữ liệu, không tạo tập feature, không huấn luyện mô hình.",
-                 f"Ngày phân tích: {datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).date().isoformat()}. Đây không phải ngày thu thập dữ liệu."]
-        def render(s, level=2):
-            parts.append(f"{'#'*level} {s['title']}")
-            if s["text"]: parts.append(s["text"])
-            for label, table in s["tables"]:
+                 "> Phạm vi: EDA và thống kê mô tả; không huấn luyện mô hình.",
+                 f"Ngày phân tích: {datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).date().isoformat()}."]
+
+        def render(item, level=2):
+            parts.append(f"{'#' * level} {item['title']}")
+            if item["text"]:
+                parts.append(item["text"])
+            for label, table in item["tables"]:
                 parts.extend([f"**{label}**", md_table(table)])
-            for p in s["figures"]:
-                parts.append(f"![{p.stem.replace('_', ' ')}](figures/{p.name})")
-                if p.name not in self.figure_notes:
-                    raise ValueError(f"Chart lacks an interpretation: {p}")
-                parts.append(self.figure_notes[p.name])
-            for block in s.get("blocks",[]): render(block,level+1)
-        for s in self.sections: render(s)
-        (self.directory / "README.md").write_text("\n\n".join(parts)+"\n", encoding="utf-8")
-        (self.directory / "analysis_metadata.json").write_text(json.dumps({
+            for filename in item["figures"]:
+                path = Path(filename)
+                if path.name not in self.figure_notes:
+                    raise ValueError(f"Chart lacks an interpretation: {path}")
+                parts.extend([f"![{path.stem.replace('_', ' ')}](figures/{path.name})",
+                              self.figure_notes[path.name]])
+            for block in item.get("blocks", []):
+                render(block, level + 1)
+
+        for item in self.sections:
+            render(item)
+        metadata = {
             "dataset": self.dataset, "facts": self.facts,
             "analysis_date": datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date().isoformat(),
             "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-            "diagnostics_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-            **({"airbnb_deep_dive_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()} if self.dataset == "AIRBNB" else {}),
-            **({"presentation_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                "research_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                "completed_stages": getattr(self, "completed_stages", []),
-                "executive_evidence": getattr(self, "executive_evidence", []),
-                "executive_numeric_checks": getattr(self, "executive_numeric_checks", []),
-                "rendered_tables_sha256": getattr(self, "rendered_tables_sha256", [])} if self.dataset == "AIRBNB" else {}),
-            **({"full_train_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()} if self.dataset == "EXPEDIA" else {}),
-            **({"research_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                "rendered_tables_sha256": self.rendered_tables_sha256,
-                "executive_evidence": self.executive_evidence} if self.dataset in {"HOTEL", "EXPEDIA"} else {}),
-            "environment": dict(environment.itertuples(index=False, name=None)),
-            "section_keys": [s["key"] for s in self.sections],
-            "download_date": "not_recorded" if self.dataset == "AIRBNB" else None,
-            "download_date_note": "Chưa có bằng chứng trong hồ sơ dự án về ngày tải hoặc mã phiên bản Kaggle. Bản dữ liệu được nhận diện bằng SHA-256." if self.dataset == "AIRBNB" else "Chưa được ghi nhận; không suy từ mtime/ctime.",
-            "figure_seed": 42,
+            "environment": environment, "section_keys": [s["key"] for s in self.sections],
             "figure_notes": self.figure_notes,
-        }, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
+            "download_date": None,
+            "download_date_note": "Chưa được cung cấp; không suy từ timestamp file.",
+            **self.metadata,
+        }
+        serialized = json.dumps(metadata, ensure_ascii=False, indent=2, default=_json_default)
+        (self.directory / "README.md").write_text("\n\n".join(parts) + "\n", encoding="utf-8")
+        (self.directory / "analysis_metadata.json").write_text(serialized + "\n", encoding="utf-8")
         return self
+
+
+def _prepare_builtin_report(report):
+    """Opt-in adapter for the original three report schemas; never used by new datasets."""
+    environment = pd.DataFrame([["Python", platform.python_version()], ["pandas", pd.__version__],
+                                ["numpy", np.__version__], ["matplotlib", matplotlib.__version__],
+                                ["Phương pháp", "Thống kê mô tả, không mô hình"],
+                                ["Chunk CSV lớn", str(CHUNK_SIZE)]], columns=["component", "value"])
+    if report.dataset == "AIRBNB":
+        import scipy
+        import nbformat
+        import IPython
+        environment = pd.concat([environment, pd.DataFrame(
+            [["scipy", scipy.__version__], ["nbformat", nbformat.__version__], ["IPython", IPython.__version__]],
+            columns=environment.columns)], ignore_index=True)
+    sampling_note = ("Expedia tính thống kê trên toàn bộ train, gồm quantile tuyến tính, skewness không chệch theo pandas và Spearman xếp hạng trung bình cho ties, loại NA theo từng cặp. Chỉ scatter (tối đa 4.000 điểm) và hình pattern missing (300 dòng) lấy mẫu hiển thị với numpy default_rng, seed=42; các bảng và heatmap tổng hợp dùng toàn bộ train. Cột raw được đệm tạm trên đĩa để giới hạn RAM và xóa sau khi xuất báo cáo; không tạo tập processed. Test chỉ là đối chiếu schema/chất lượng và các phân phối tổng hợp, không dùng tính thống kê train. " if report.dataset == "EXPEDIA" else "Hình lấy mẫu hiển thị dùng seed=42. ")
+    report.add("reproducibility", "Tái lập và kiểm soát phạm vi", "Chạy notebook theo thứ tự từ đầu, hoặc chạy `python scripts/eda_all_datasets.py --dataset " + report.dataset + "` tại thư mục gốc. Script chỉ đọc CSV raw, viết báo cáo/biểu đồ và lưu notebook trong notebooks/; không sửa raw, không ghi data/processed, không gọi pipeline huấn luyện. Các thời điểm phân tích dùng Asia/Ho_Chi_Minh. SHA-256 ở danh mục file nhận diện nguồn; số dòng theo CSV parser được đối chiếu với data_lines của file chính. Ngày tải raw chưa được ghi nhận; không suy từ mtime/ctime. " + sampling_note + "Script thực thi các cell bằng IPython trong cùng tiến trình và lưu output thật vào notebook; không khởi tạo kernel mạng. Phụ thuộc dựng báo cáo gồm pandas, numpy, scipy, matplotlib, nbformat và IPython; có thể mở notebook bằng Jupyter để Run All.", [("Môi trường thực thi", environment)])
+    if report.dataset == "AIRBNB":
+        pass  # Hàm đã được định nghĩa trong cùng file.
+        report.sections[-1] = reproducibility_section(report, environment)
+        prepare_publication = airbnb_prepare_publication
+        prepare_publication(report)
+    else:
+        prepare_publication = hotel_expedia_prepare_publication
+        prepare_publication(report)
+    digest = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    report.metadata.update(diagnostics_script_sha256=digest,
+                           environment=dict(environment.itertuples(index=False, name=None)))
+    if report.dataset == "AIRBNB":
+        report.metadata.update(
+            airbnb_deep_dive_script_sha256=digest, presentation_script_sha256=digest,
+            research_script_sha256=digest,
+            completed_stages=getattr(report, "completed_stages", []),
+            executive_evidence=getattr(report, "executive_evidence", []),
+            executive_numeric_checks=getattr(report, "executive_numeric_checks", []),
+            rendered_tables_sha256=getattr(report, "rendered_tables_sha256", []),
+            download_date="not_recorded",
+        )
+    else:
+        report.metadata.update(research_script_sha256=digest,
+                               rendered_tables_sha256=report.rendered_tables_sha256,
+                               executive_evidence=report.executive_evidence)
+    if report.dataset == "EXPEDIA":
+        report.metadata["full_train_script_sha256"] = digest
 
 
 def show_section(report, key):
@@ -3446,12 +3597,7 @@ def show_section(report, key):
         if s["text"]: display(Markdown(s["text"]))
         for label, table in s["tables"]:
             display(Markdown(f"**{label}**"))
-            if report.dataset in {"AIRBNB", "HOTEL", "EXPEDIA"}:
-                display(Markdown(md_table(table)))
-            else:
-                with pd.option_context("display.max_rows", max(100, len(table)), "display.max_columns", 30,
-                                       "display.float_format", lambda x: f"{x:,.4f}"):
-                    display(table)
+            display(Markdown(md_table(table)))
         for p in s["figures"]:
             display(Image(filename=str(p)))
             display(Markdown(report.figure_notes[p.name]))
@@ -3460,6 +3606,7 @@ def show_section(report, key):
 
 
 def manifest(root, dataset):
+    root = Path(root)
     rows = []
     for p in sorted((root/"data"/"raw"/dataset).glob("*.csv")):
         h = hashlib.sha256()
@@ -3514,7 +3661,7 @@ HOTEL_MEANINGS = {
 
 
 def hotel_report(root):
-    r = Report("HOTEL", "HOTEL — Hiểu dữ liệu đặt phòng và kết quả hủy/no-show", root)
+    r = Report("HOTEL", "HOTEL — Hiểu dữ liệu đặt phòng và kết quả hủy/no-show", root, prepare=_prepare_builtin_report)
     df = pd.read_csv(root/"data/raw/HOTEL/hotel_bookings.csv")
     inventory = manifest(root, "HOTEL")
     n = len(df)
@@ -3640,7 +3787,7 @@ AIRBNB_MEANINGS = {
 def airbnb_report(root):
     pass  # Hàm đã được định nghĩa trong cùng file.
     pass  # Hàm đã được định nghĩa trong cùng file.
-    r = Report("AIRBNB", "AIRBNB — Hiểu người dùng mới, lượt đặt chỗ đầu tiên và độ phủ hành vi", root)
+    r = Report("AIRBNB", "AIRBNB — Hiểu người dùng mới, lượt đặt chỗ đầu tiên và độ phủ hành vi", root, prepare=_prepare_builtin_report)
     folder = root/"data/raw/AIRBNB"
     train = pd.read_csv(folder/"train_users_2.csv")
     test = pd.read_csv(folder/"test_users.csv")
@@ -3949,12 +4096,12 @@ def expedia_report(root):
 
 
 def _expedia_report(root,inventory,store):
-    r=Report("EXPEDIA","EXPEDIA — Hiểu tìm kiếm, click và booking ở cấp khách sạn hiển thị",root)
+    r=Report("EXPEDIA","EXPEDIA — Hiểu tìm kiếm, click và booking ở cấp khách sạn hiển thị",root, prepare=_prepare_builtin_report)
     folder=root/"data/raw/EXPEDIA"
     train=scan_expedia(folder/"train.csv",True,store)
     test=scan_expedia(folder/"test.csv",False)
     pass  # Hàm đã được định nghĩa trong cùng file.
-    train["correlation"],train["correlation_pairs"]=exact_spearman(store)
+    train["correlation"],train["correlation_pairs"]=exact_spearman(store, CORRELATION_COLUMNS)
     n=train["rows"]; query=train["queries"]; groups=train["groups"]
     clicks=int(query.clicks.sum()); bookings=int(query.bookings.sum())
     r.facts=dict(rows=n,columns=len(train["missing"]),test_rows=test["rows"],test_columns=len(test["missing"]),
@@ -4060,15 +4207,161 @@ Không class weighting, resampling, imputation, clipping, encoding, feature engi
     return r.publish()
 
 
+def dataframe_report(df, dataset, root, *, title=None, numeric_columns=None,
+                     categorical_columns=None, target=None, group_columns=None,
+                     meanings=None, test=None, drift_columns=None, prepare=None,
+                     publish=True, plots=True):
+    """EDA for an arbitrary DataFrame, with optional binary labels/test frame.
+
+    Raw values are never changed. Numeric/categorical columns are inferred by
+    dtype unless explicitly supplied; exclude IDs using the column parameters.
+    No target is inferred or manufactured. Missing labels are excluded from
+    rate denominators. Set publish=False to add your own sections first.
+    This entry point holds the DataFrame in RAM; TrainColumns is available for
+    custom chunked analyses of larger data.
+    """
+    if not df.columns.is_unique:
+        raise ValueError("EDA requires unique column names")
+    numeric = ([c for c in df.select_dtypes(include="number").columns if c != target]
+               if numeric_columns is None else list(numeric_columns))
+    categorical = ([c for c in df.columns if c != target and
+                    (not pd.api.types.is_numeric_dtype(df[c]) or pd.api.types.is_bool_dtype(df[c]))
+                    and not pd.api.types.is_datetime64_any_dtype(df[c])]
+                   if categorical_columns is None else list(categorical_columns))
+    groups = list(group_columns or [])
+    requested = numeric + categorical + groups + ([] if target is None else [target])
+    missing = [c for c in requested if c not in df.columns]
+    if missing:
+        raise ValueError(f"Columns not found: {missing}")
+    if any(not pd.api.types.is_numeric_dtype(df[c]) for c in numeric):
+        raise ValueError("numeric_columns must refer to numeric dtypes")
+    if target is not None:
+        validate_binary_target(df[target], target)
+    report = Report(dataset, title or f"{dataset} — EDA và thống kê mô tả", root, prepare=prepare)
+    report.facts.update(rows=len(df), columns=len(df.columns), duplicates=int(df.duplicated().sum()),
+                        target=target, numeric_columns=numeric, categorical_columns=categorical)
+    report.add("overview", "Tổng quan", "Mỗi dòng là một quan sát theo định nghĩa của người cung cấp dữ liệu.",
+               [("Quy mô", pd.DataFrame([report.facts], columns=["rows", "columns", "duplicates"]))])
+    report.add("dictionary", "Từ điển và chất lượng dữ liệu", "Ô mô tả trống là thông tin chưa được cung cấp.",
+               [("Thông tin cột", metadata_table(df, meanings))])
+    if numeric:
+        report.add("numeric", "Thống kê biến số", "Phân vị, độ lệch và hàng rào IQR dùng các giá trị không thiếu của từng cột; không xóa ngoại lai.",
+                   [("Thống kê mô tả", numeric_table(df, numeric)),
+                    ("Ngoại lai 1,5×IQR", iqr_table(df, numeric, dataset))])
+        usable = [c for c in numeric if df[c].notna().any()]
+        if plots and usable:
+            fig, axes = plt.subplots(len(usable), 1, figsize=(9, 3 * len(usable)), squeeze=False)
+            for ax, column in zip(axes.flat, usable):
+                values = df[column].dropna()
+                finite = values[np.isfinite(values)]
+                ax.hist(finite, bins=30, color=BLUE)
+                ax.set(title=f"{column}: {len(finite):,} finite values; {len(values)-len(finite):,} infinite excluded from plot",
+                       xlabel=column, ylabel="Observations")
+            fig.tight_layout()
+            path = report.savefig("numeric_distributions", fig)
+            fig_note(report, path, "Histogram dùng mọi giá trị hữu hạn không thiếu, không cắt đuôi ngoại lai. Giá trị vô hạn chỉ được loại khỏi hình, không sửa raw hoặc bảng thống kê.")
+            report.sections[-1]["figures"].append(path)
+        if len(numeric) >= 2:
+            corr = df[numeric].corr(method="spearman")
+            report.add("correlation", "Tương quan Spearman", "Loại NA theo từng cặp, không suy quan hệ nhân quả.",
+                       [("Spearman", corr.reset_index(names="column"))])
+    if categorical:
+        report.add("categorical", "Thống kê biến phân loại", "Tỷ lệ trên tất cả dòng; nhóm thiếu được hiển thị riêng.",
+                   [("Nhóm phổ biến", categorical_table(df, categorical)),
+                    ("Số nhóm và nhóm hiếm", category_cardinality(df, categorical))])
+    if target is not None:
+        report.facts.update(labelled_rows=int(df[target].notna().sum()), missing_labels=int(df[target].isna().sum()))
+        counts = df[target].value_counts(dropna=False).rename_axis(target).reset_index(name="n")
+        report.add("target", "Phân phối nhãn", "Chỉ dùng nhãn 0/1 được cung cấp. NA là chưa có nhãn, không phải âm tính.",
+                   [("Số lượng nhãn", counts)] +
+                   [(f"Tỷ lệ theo {c}", rate_table(df, c, target)) for c in groups])
+    elif groups:
+        raise ValueError("group_columns for target rates requires an explicit target")
+    if test is not None:
+        schema = pd.DataFrame({"column": df.columns.union(test.columns, sort=False)})
+        schema["in_train"] = schema.column.isin(df.columns)
+        schema["in_test"] = schema.column.isin(test.columns)
+        comparisons = [("Schema train/test", schema)]
+        drift = ([c for c in categorical if c in test.columns] if drift_columns is None else list(drift_columns))
+        if drift:
+            comparisons.append(("Total variation phân loại (0–1)", drift_table(df, test, drift)))
+        report.add("train_test", "Đối chiếu train/test", "So sánh mô tả; không fit phép biến đổi hoặc gộp hai tập.", comparisons)
+    return report.publish() if publish else report
+
+
+def csv_report(root, *, dataset, file, test_file=None, read_csv_options=None, **options):
+    """Read your CSV(s) and call dataframe_report; relative paths use data/raw/<dataset>/."""
+    root = Path(root)
+    def resolve(filename):
+        path = Path(filename)
+        return path if path.is_absolute() else root / "data" / "raw" / dataset / path
+    reader = dict(read_csv_options or {})
+    frame = pd.read_csv(resolve(file), **reader)
+    test = pd.read_csv(resolve(test_file), **reader) if test_file is not None else None
+    report = dataframe_report(frame, dataset, root, test=test, publish=False, **options)
+    report.metadata["source_files"] = [str(resolve(file))] + ([] if test_file is None else [str(resolve(test_file))])
+    return report.publish()
+
+
+# Domain-specific code is opt-in through this registry. New datasets do not
+# inherit the old sources, target definitions, presentation or verification.
+REPORTS = {"HOTEL": hotel_report, "AIRBNB": airbnb_report, "EXPEDIA": expedia_report}
+REPORT_LAYOUTS = {"HOTEL": LAYOUT, "AIRBNB": AIRBNB_LAYOUT, "EXPEDIA": LAYOUT}
+REPORT_CONFIGS = {}
+REPORT_NOTEBOOK_SETUP = {}
+
+
+def register_report(dataset, builder, *, notebook_setup=None, layout=None):
+    """Register builder(root) -> Report. notebook_setup is trusted Python code
+    that repeats your registration when reopening a generated notebook.
+    Programmatic builders need no notebook_setup when only using build_report.
+    """
+    if not isinstance(dataset, str) or not dataset or Path(dataset).name != dataset or dataset in {".", ".."}:
+        raise ValueError("dataset must be a nonempty folder name")
+    if not callable(builder):
+        raise TypeError("builder must be callable")
+    REPORTS[dataset] = builder
+    REPORT_LAYOUTS[dataset] = layout
+    REPORT_NOTEBOOK_SETUP[dataset] = notebook_setup
+    REPORT_CONFIGS.pop(dataset, None)
+
+
+def register_csv_report(dataset, **config):
+    """Register a serializable CSV configuration, usable from CLI and notebooks."""
+    from functools import partial
+    # Store a JSON copy so later mutation of the caller's lists cannot change it.
+    config = json.loads(json.dumps(config))
+    if "file" not in config:
+        raise ValueError("CSV configuration requires 'file'")
+    forbidden = {"dataset", "root", "publish", "prepare", "test"}.intersection(config)
+    if forbidden:
+        raise ValueError(f"Unsupported CSV configuration keys: {sorted(forbidden)}")
+    register_report(dataset, partial(csv_report, dataset=dataset, **config))
+    REPORT_CONFIGS[dataset] = config
+
+
 def build_report(dataset, root):
-    return {"HOTEL":hotel_report,"AIRBNB":airbnb_report,"EXPEDIA":expedia_report}[dataset](Path(root))
+    """Run a registered report builder, with a clear error for unknown names."""
+    if dataset not in REPORTS:
+        raise ValueError(f"Unknown dataset {dataset!r}; register_report/register_csv_report first. Available: {', '.join(REPORTS)}")
+    return REPORTS[dataset](Path(root))
 
 
 def make_notebook(root, dataset):
     """Tạo notebook chạy lại bằng duy nhất file eda_all_datasets.py và CSV raw."""
     import nbformat as nbf
 
-    layout = AIRBNB_LAYOUT if dataset == "AIRBNB" else LAYOUT
+    if dataset not in REPORTS:
+        raise ValueError(f"Unknown dataset: {dataset!r}")
+    layout = REPORT_LAYOUTS.get(dataset)
+    registration = ""
+    if dataset in REPORT_CONFIGS:
+        registration = ("import json\n" + f"eda.register_csv_report({dataset!r}, **json.loads({json.dumps(REPORT_CONFIGS[dataset])!r}))\n")
+    elif dataset in REPORT_NOTEBOOK_SETUP:
+        registration = REPORT_NOTEBOOK_SETUP[dataset]
+        if registration is None:
+            raise ValueError("Custom builders need notebook_setup code to make a reproducible notebook; or use register_csv_report")
+        registration += "\n"
     title = human_title if dataset == "AIRBNB" else str
     introduction = (
         f"# {dataset} — EDA, thống kê mô tả và tìm hiểu sơ bộ\n\n"
@@ -4098,11 +4391,17 @@ spec = importlib.util.spec_from_file_location('eda_all_datasets', EDA_FILE)
 eda = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = eda
 spec.loader.exec_module(eda)
-""" + f"report = eda.build_report('{dataset}', PROJECT_ROOT)\n" + "print('Đã tính EDA từ CSV raw:', report.facts)"
+""" + registration + f"report = eda.build_report({dataset!r}, PROJECT_ROOT)\n" + "print('Đã tính EDA từ CSV raw:', report.facts)"
     cells = [nbf.v4.new_markdown_cell(introduction), nbf.v4.new_code_cell(setup)]
-    for key, heading in layout:
+    for key, heading in layout or []:
         cells.extend([nbf.v4.new_markdown_cell(f"## {title(heading)}"),
-                      nbf.v4.new_code_cell(f"eda.show_section(report, '{key}')")])
+                      nbf.v4.new_code_cell(f"eda.show_section(report, {key!r})")])
+    if layout is None:
+        cells.append(nbf.v4.new_code_cell(
+            "from IPython.display import Markdown, display\n"
+            "for item in report.sections:\n"
+            "    display(Markdown('## ' + item['title']))\n"
+            "    eda.show_section(report, item['key'])"))
     nb = nbf.v4.new_notebook(cells=cells)
     nb.metadata.update(
         kernelspec={"display_name": "Python 3 (ipykernel)", "language": "python", "name": "python3"},
@@ -4242,30 +4541,48 @@ python scripts/eda_all_datasets.py --dataset AIRBNB
     (root/"reports/README.md").write_text(text,encoding="utf-8")
 
 
-def main():
+FUNCTION_GROUPS["API tái sử dụng cho dữ liệu mới"] = [
+    "dataframe_report", "csv_report", "register_report", "register_csv_report",
+    "validate_binary_target",
+]
+
+
+def main(argv=None):
     import sys
     import nbformat
     from IPython.core.interactiveshell import InteractiveShell
     from IPython.utils.capture import capture_output
     from traitlets.config import Config
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dataset", choices=["HOTEL", "AIRBNB", "EXPEDIA"], help="Bỏ trống để chạy cả 3 bộ")
+    parser.add_argument("--dataset", help="Tên bộ dữ liệu đã đăng ký; bỏ trống để chạy các bộ trong --config, hoặc ba bộ cũ")
+    parser.add_argument("--config", type=Path, help="JSON: {tên_bộ: {file: tên.csv, target: tên_nhãn, ...}}; target có thể bỏ trống")
     parser.add_argument("--root", type=Path, help="Thư mục dự án chứa data/raw (mặc định tự tìm từ vị trí file)")
     parser.add_argument("--list-functions", action="store_true", help="Liệt kê hàm/class, không đọc CSV hoặc ghi báo cáo")
-    args=parser.parse_args()
+    args=parser.parse_args(argv)
     if args.list_functions:
         for group, names in FUNCTION_GROUPS.items():
             print(group + ":")
             print("  " + ", ".join(names))
         return
+    configured = []
+    if args.config:
+        configs = json.loads(args.config.read_text(encoding="utf-8-sig"))
+        if not isinstance(configs, dict) or not configs:
+            parser.error("--config phải là object JSON không rỗng chứa tên các bộ dữ liệu")
+        for name, config in configs.items():
+            register_csv_report(name, **config)
+            configured.append(name)
+    selected = [args.dataset] if args.dataset else (configured or list(REPORTS))
+    unknown = [name for name in selected if name not in REPORTS]
+    if unknown:
+        parser.error(f"Bộ dữ liệu chưa đăng ký: {unknown}; dùng --config cho bộ mới")
     here = Path(__file__).resolve().parent
     root = args.root.resolve() if args.root else next(
         (p for p in (here, *here.parents) if (p / "data" / "raw").is_dir()), None)
-    if root is None or not (root / "data" / "raw").is_dir():
-        parser.error("Không tìm thấy data/raw; hãy truyền --root đường/dẫn/dự/án")
+    if root is None or not root.is_dir():
+        parser.error("Không tìm thấy thư mục dự án; hãy truyền --root đường/dẫn/dự/án")
     if str(root) not in sys.path:
         sys.path.insert(0,str(root))
-    selected=[args.dataset] if args.dataset else ["HOTEL","AIRBNB","EXPEDIA"]
     shell_config=Config()
     shell_config.HistoryManager.hist_file=":memory:"
     shell=InteractiveShell.instance(config=shell_config)
@@ -4304,13 +4621,16 @@ def main():
         path.parent.mkdir(parents=True,exist_ok=True)
         nbformat.write(nb,path)
         print(f"Saved {dataset} notebook: {path}",flush=True)
+        if dataset in REPORT_CONFIGS or dataset in REPORT_NOTEBOOK_SETUP:
+            # Generic/custom reports have no old-domain assertions.
+            continue
         if dataset == "AIRBNB":
             verify_artifacts = airbnb_verify_artifacts
             verify_artifacts(root, nb)
         else:
             verify_artifacts = hotel_expedia_verify_artifacts
             verify_artifacts(root, dataset, nb)
-    if all((root/"reports"/d/"analysis_metadata.json").exists() for d in ["HOTEL","AIRBNB","EXPEDIA"]):
+    if any(d in {"HOTEL", "AIRBNB", "EXPEDIA"} and d not in REPORT_CONFIGS and d not in REPORT_NOTEBOOK_SETUP for d in selected) and all((root/"reports"/d/"analysis_metadata.json").exists() for d in ["HOTEL","AIRBNB","EXPEDIA"]):
         write_summary(root)
         print("Updated reports/README.md",flush=True)
 
